@@ -15,7 +15,7 @@ func NewResidentRepository(db *sql.DB) *ResidentRepository {
 	return &ResidentRepository{db: db}
 }
 
-func (r *ResidentRepository) FindOrCreateByAadhaarHash(req model.ResidentLookupResponse) (*model.Resident, error) {
+func (r *ResidentRepository) FindOrCreateByAadhaarHash(req model.ResidentLookupRequest) (*model.Resident, error) {
 	resident := &model.Resident{}
 
 	// Try to find existing residnet by aadhaar_hash
