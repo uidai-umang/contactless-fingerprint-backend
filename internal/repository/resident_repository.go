@@ -38,7 +38,7 @@ func (r *ResidentRepository) FindOrCreateByAadhaarHash(req model.ResidentLookupR
 		insertQuery := `
 		INSERT INTO residents (aadhaar_hash, age_group, gender, skin_tone)
 		VALUES ($1, $2, $3, $4)
-		RETURNING resident_pseudonym_id, aadhaar_hash, age_group, skin_tone, created_at
+		RETURNING resident_pseudonym_id, aadhaar_hash, age_group, gender, skin_tone, created_at
 		`
 		err = r.db.QueryRow(insertQuery,
 			req.AadhaarHash,
