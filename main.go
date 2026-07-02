@@ -5,9 +5,20 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+
+	"contactless-fingerprint-backend/internal/db"
 )
 
 func main() {
+	err := godotenv.Load()
+
+	if err != nil {
+		log.Fatal("Error Loading .env file")
+	}
+
+	db.Connect()
+
 	router := gin.Default()
 
 	router.GET("/health", func(ctx *gin.Context) {
@@ -18,5 +29,5 @@ func main() {
 	})
 
 	log.Println("Server starting on port 8080...")
-    router.Run(":8080")
+	router.Run(":8080")
 }
