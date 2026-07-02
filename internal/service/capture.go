@@ -1,0 +1,83 @@
+package service
+
+import (
+	"contactless-fingerprint-backend/internal/model"
+	"contactless-fingerprint-backend/internal/repository"
+)
+
+type CaptureService struct {
+	captureRepo *repository.CaptureRepository
+	sessionRepo *repository.SessionRepository
+}
+
+func NewCaptureService(
+	captureRepo *repository.CaptureRepository,
+	sessionRepo *repository.SessionRepository,
+) *CaptureService {
+	return &CaptureService{
+		captureRepo: captureRepo,
+		sessionRepo: sessionRepo,
+	}
+}
+
+// Upload handles a single fingerprint capture.
+// Validates session exists, generates CEPH key, saves capture record.
+func (s *CaptureService) Upload(req model.CaptureRequest) (*model.CaptureResponse, error) {
+	// Verify session exists and is active
+	session, err := s.sessionRepo.GetByID(req.SessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate CEPH object key for image storage path
+	cephKey := repository.GenerateCephKey(
+		session.CentreID,
+		req.ResidentPseudonymID,
+		req.SessionID,
+		req.FingerType,
+	)
+
+	// Save capture record to DB
+	capture, err := s.captureRepo.Insert(req, cephKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get updated total count for this resident
+	allCaptures, err := s.captureRepo.GetByResidentID(req.ResidentPseudonymID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Count only successfully uploaded captures
+	uploadedCount := 0
+	for _, c := range allCaptures {
+		if c.UploadStatus == "UPLOADED" {
+			uploadedCount++
+		}
+	}
+
+	return &model.CaptureResponse{
+		CaptureID:     capture.CaptureID,
+		FingerType:    capture.FingerType,
+		UploadStatus:  capture.UploadStatus,
+		TotalCaptured: uploadedCount,
+		IsComplete:    uploadedCount >= 10,
+	}, nil
+}
+
+// BatchUpload handles multiple pending captures in one request.
+// Used when Android detects pending uploads on session resume.
+func (s *CaptureService) BatchUpload(req model.BatchCaptureRequest) ([]model.CaptureResponse, error) {
+	responses := []model.CaptureResponse{}
+
+	for _, captureReq := range req.Captures {
+		resp, err := s.Upload(captureReq)
+		if err != nil {
+			return nil, err
+		}
+		responses = append(responses, *resp)
+	}
+
+	return responses, nil
+}
