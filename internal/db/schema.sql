@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Stores ASK (AADHAAR SEVA KENDRA) centres information
 CREATE TABLE IF NOT EXISTS centres (
-    center_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    centre_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     city VARCHAR(255) NOT NULL,
     state VARCHAR(255) NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS centres (
 -- Stores operator accounts linked to a centre
 CREATE TABLE IF NOT EXISTS operators (
     operator_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    center_id UUID REFERENCES centres(center_id),
+    centre_id UUID REFERENCES centres(centre_id),
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     phone_number VARCHAR(15) UNIQUE NOT NULL,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     session_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     operator_id UUID REFERENCES operators(operator_id),
     device_id UUID REFERENCES devices(device_id),
-    center_id UUID REFERENCES centres(center_id),
+    centre_id UUID REFERENCES centres(centre_id),
     resident_pseudonym_id UUID REFERENCES residents(resident_pseudonym_id),
     status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'COMPLETED', 'ABANDONED', 'TIMED_OUT')),
     started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
