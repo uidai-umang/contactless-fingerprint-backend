@@ -65,19 +65,3 @@ func (s *CaptureService) Upload(req model.CaptureRequest, imageBytes []byte) (*m
 		IsComplete:    uploadedCount >= 10,
 	}, nil
 }
-
-// BatchUpload handles multiple pending captures in one request.
-// Used when Android detects pending uploads on session resume.
-func (s *CaptureService) BatchUpload(req model.BatchCaptureRequest) ([]model.CaptureResponse, error) {
-	responses := []model.CaptureResponse{}
-
-	for _, captureReq := range req.Captures {
-		resp, err := s.Upload(captureReq)
-		if err != nil {
-			return nil, err
-		}
-		responses = append(responses, *resp)
-	}
-
-	return responses, nil
-}
