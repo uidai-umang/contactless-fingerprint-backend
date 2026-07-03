@@ -139,6 +139,7 @@ type CreateSessionRequest struct {
 }
 
 // CaptureRequest is sent after each successful finger capture
+// Image is received as multipart file
 type CaptureRequest struct {
 	SessionID           string  `json:"session_id" binding:"required"`
 	ResidentPseudonymID string  `json:"resident_pseudonym_id" binding:"required"`
@@ -151,7 +152,6 @@ type CaptureRequest struct {
 	GlareScore          float64 `json:"glare_score"`
 	AttemptCount        int     `json:"attempt_count"`
 	DegradedFlag        bool    `json:"degraded_flag"`
-	ImageBase64         string  `json:"image_base64" binding:"required"`
 	ImageChecksum       string  `json:"image_checksum"`
 	CameraModel         string  `json:"camera_model"`
 	CameraResolution    string  `json:"camera_resolution"`
