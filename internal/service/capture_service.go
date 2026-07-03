@@ -21,9 +21,8 @@ func NewCaptureService(
 }
 
 // Upload handles a single fingerprint capture.
-// Validates session exists, generates CEPH key, saves capture record.
-func (s *CaptureService) Upload(req model.CaptureRequest) (*model.CaptureResponse, error) {
-	// Verify session exists and is active
+// imageBytes contains the raw image received from multipart upload.
+func (s *CaptureService) Upload(req model.CaptureRequest, imageBytes []byte) (*model.CaptureResponse, error) {
 	session, err := s.sessionRepo.GetByID(req.SessionID)
 	if err != nil {
 		return nil, err
@@ -37,19 +36,20 @@ func (s *CaptureService) Upload(req model.CaptureRequest) (*model.CaptureRespons
 		req.FingerType,
 	)
 
-	// Save capture record to DB
+	// TODO: Upload imageBytes to CEPH here
+	// For now just store the key reference in DB
+	_ = imageBytes
+
 	capture, err := s.captureRepo.Insert(req, cephKey)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get updated total count for this resident
 	allCaptures, err := s.captureRepo.GetByResidentID(req.ResidentPseudonymID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Count only successfully uploaded captures
 	uploadedCount := 0
 	for _, c := range allCaptures {
 		if c.UploadStatus == "UPLOADED" {
