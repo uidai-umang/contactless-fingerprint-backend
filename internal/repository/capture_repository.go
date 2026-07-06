@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lib/pq"
+
 	"contactless-fingerprint-backend/internal/model"
 )
 
@@ -16,7 +18,24 @@ func NewCaptureRepository(db *sql.DB) *CaptureRepository {
 	return &CaptureRepository{db: db}
 }
 
-// Insert saves a single capture record and returns it with generated capture_id
+// ExistsUploaded reports whether a capture with UPLOADED status already exists
+// for the given (session_id, resident_pseudonym_id, finger_type) combination.
+func (r *CaptureRepository) ExistsUploaded(sessionID, residentPseudonymID, fingerType string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1 FROM captures
+			WHERE session_id = $1
+			  AND resident_pseudonym_id = $2
+			  AND finger_type = $3
+			  AND upload_status = 'UPLOADED'
+		)
+	`, sessionID, residentPseudonymID, fingerType).Scan(&exists)
+	return exists, err
+}
+
+// Insert saves a single capture record and returns it with generated capture_id.
+// Returns *ErrForeignKeyViolation if any referenced FK does not exist.
 func (r *CaptureRepository) Insert(req model.CaptureRequest, cephKey string) (*model.Capture, error) {
 	capture := &model.Capture{}
 
@@ -79,6 +98,9 @@ func (r *CaptureRepository) Insert(req model.CaptureRequest, cephKey string) (*m
 		&capture.CreatedAt,
 	)
 	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23503" {
+			return nil, &ErrForeignKeyViolation{Field: parseFKField(pqErr.Constraint)}
+		}
 		return nil, err
 	}
 
@@ -166,3 +188,4 @@ func GenerateCephKey(centreID, residentID, sessionID, fingerType string) string 
 	return fmt.Sprintf("/sitaa-clf/%s/%s/%s/%s_%s.enc",
 		centreID, residentID, sessionID, fingerType, timestamp)
 }
+

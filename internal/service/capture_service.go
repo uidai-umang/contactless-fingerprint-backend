@@ -21,14 +21,22 @@ func NewCaptureService(
 }
 
 // Upload handles a single fingerprint capture.
-// imageBytes contains the raw image received from multipart upload.
+// Returns repository.ErrNotFound if the session does not exist,
+// repository.ErrDuplicateCapture if this finger was already captured for the session.
 func (s *CaptureService) Upload(req model.CaptureRequest, imageBytes []byte) (*model.CaptureResponse, error) {
 	session, err := s.sessionRepo.GetByID(req.SessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Generate CEPH object key for image storage path
+	exists, err := s.captureRepo.ExistsUploaded(req.SessionID, req.ResidentPseudonymID, req.FingerType)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, repository.ErrDuplicateCapture
+	}
+
 	cephKey := repository.GenerateCephKey(
 		session.CentreID,
 		req.ResidentPseudonymID,
@@ -37,7 +45,6 @@ func (s *CaptureService) Upload(req model.CaptureRequest, imageBytes []byte) (*m
 	)
 
 	// TODO: Upload imageBytes to CEPH here
-	// For now just store the key reference in DB
 	_ = imageBytes
 
 	capture, err := s.captureRepo.Insert(req, cephKey)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"os"
 
@@ -13,6 +14,23 @@ import (
 	"contactless-fingerprint-backend/internal/repository"
 	"contactless-fingerprint-backend/internal/service"
 )
+
+// getLocalIP finds the machine's local network IP address
+// (the one other devices on the same WiFi can use to reach this server)
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "unknown"
+	}
+	for _, addr := range addrs {
+		if ipNet, ok := addr.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
+			if ipNet.IP.To4() != nil {
+				return ipNet.IP.String()
+			}
+		}
+	}
+	return "unknown"
+}
 
 func main() {
 	// Load .env - must run before anything else to ensure environment variables are set
@@ -74,6 +92,10 @@ func main() {
 		port = "8080"
 	}
 
-	log.Println("Server starting on port 8080...")
-	router.Run(":8080")
+	localIP := getLocalIP()
+	log.Printf("Server starting on port %s...", port)
+	log.Printf("Local access:   http://localhost:%s", port)
+	log.Printf("Network access: http://%s:%s   <-- use this IP in Android's local.properties", localIP, port)
+
+	router.Run(":" + port)
 }
