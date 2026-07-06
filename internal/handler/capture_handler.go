@@ -132,19 +132,23 @@ type batchItemValidationError struct {
 //	500 — unexpected error
 func (h *CaptureHandler) BatchUpload(ctx *gin.Context) {
 	if err := ctx.Request.ParseMultipartForm(50 << 20); err != nil {
-		respondError(ctx, http.StatusBadRequest, "Failed to parse multipart form")
+		log.Printf("ParseMultipartForm error: %v", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse multipart form"})
 		return
 	}
 
 	form := ctx.Request.MultipartForm
-	files := form.File["images"]
-	count := len(files)
+	log.Printf("Multipart form keys: %+v", form.Value)
+	log.Printf("Multipart file keys: %+v", form.File)
 
+	files := form.File["image"]
+	log.Printf("Number of 'images' files found: %d", len(files))
+
+	count := len(files)
 	if count == 0 {
-		respondError(ctx, http.StatusBadRequest, "No images provided")
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "No images provided"})
 		return
 	}
-
 	// ── Phase 1: validate all items before processing any ──────────────────
 	type parsedItem struct {
 		req        model.CaptureRequest
