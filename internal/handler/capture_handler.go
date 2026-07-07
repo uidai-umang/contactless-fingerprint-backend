@@ -213,7 +213,11 @@ func (h *CaptureHandler) BatchUpload(ctx *gin.Context) {
 	for i, item := range items {
 		response, err := h.captureService.Upload(item.req, item.imageBytes)
 		if err != nil {
-			// A DB-level failure on any item aborts the batch with the right status.
+			if errors.Is(err, repository.ErrDuplicateCapture) {
+				// Data already exists on the server — skip without failing the batch.
+				log.Printf("BatchUpload item %d skipped (already captured): finger_type=%s", i, item.req.FingerType)
+				continue
+			}
 			log.Printf("BatchUpload item %d error: %v", i, err)
 			mapCaptureError(ctx, err)
 			return

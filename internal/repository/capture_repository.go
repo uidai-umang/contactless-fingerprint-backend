@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -98,8 +99,13 @@ func (r *CaptureRepository) Insert(req model.CaptureRequest, cephKey string) (*m
 		&capture.CreatedAt,
 	)
 	if err != nil {
-		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23503" {
-			return nil, &ErrForeignKeyViolation{Field: parseFKField(pqErr.Constraint)}
+		if pqErr, ok := err.(*pq.Error); ok {
+			if pqErr.Code == "23503" {
+				return nil, &ErrForeignKeyViolation{Field: parseFKField(pqErr.Constraint)}
+			}
+			if pqErr.Code == "23505" && strings.Contains(pqErr.Constraint, "unique_uploaded_finger_per_resident") {
+				return nil, ErrDuplicateCapture
+			}
 		}
 		return nil, err
 	}

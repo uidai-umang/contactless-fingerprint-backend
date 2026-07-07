@@ -102,6 +102,11 @@ CREATE TABLE IF NOT EXISTS captures (
     uploaded_at TIMESTAMP
 );
 
+-- Prevents two UPLOADED rows for the same resident+finger_type (eliminates check-then-insert race)
+CREATE UNIQUE INDEX IF NOT EXISTS unique_uploaded_finger_per_resident
+ON captures (resident_pseudonym_id, finger_type)
+WHERE upload_status = 'UPLOADED';
+
 -- Append-only audit trail — no UPDATE or DELETE ever allowed on this table
 CREATE TABLE IF NOT EXISTS audit_logs (
     log_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

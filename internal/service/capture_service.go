@@ -1,8 +1,12 @@
 package service
 
 import (
+	"context"
+	"fmt"
+
 	"contactless-fingerprint-backend/internal/model"
 	"contactless-fingerprint-backend/internal/repository"
+	"contactless-fingerprint-backend/internal/storage"
 )
 
 type CaptureService struct {
@@ -44,8 +48,9 @@ func (s *CaptureService) Upload(req model.CaptureRequest, imageBytes []byte) (*m
 		req.FingerType,
 	)
 
-	// TODO: Upload imageBytes to CEPH here
-	_ = imageBytes
+	if err := storage.UploadObject(context.Background(), cephKey, imageBytes); err != nil {
+		return nil, fmt.Errorf("failed to upload image to CEPH: %w", err)
+	}
 
 	capture, err := s.captureRepo.Insert(req, cephKey)
 	if err != nil {
