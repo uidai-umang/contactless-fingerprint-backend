@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"contactless-fingerprint-backend/internal/handler"
 	"contactless-fingerprint-backend/internal/repository"
 	"contactless-fingerprint-backend/internal/service"
+	"contactless-fingerprint-backend/internal/storage"
 )
 
 // getLocalIP finds the machine's local network IP address
@@ -41,6 +43,18 @@ func main() {
 
 	// Connect to PostgreSQL
 	db.Connect()
+
+	if err := storage.Connect(); err != nil {
+		log.Fatalf("Failed to connect to CEPH storage: %v", err)
+	}
+	log.Println("CEPH storage client initialized")
+
+	if err := storage.TestConnection(context.Background()); err != nil {
+		log.Printf("WARNING: CEPH connectivity test failed: %v", err)
+		log.Printf("Server will continue running but image uploads will fail until CEPH is reachable")
+	} else {
+		log.Println("CEPH storage connected and verified successfully")
+	}
 
 	// gin.Default() includes Logger and Recovery middleware
 	router := gin.Default()
