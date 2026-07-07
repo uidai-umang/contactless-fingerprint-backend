@@ -48,8 +48,21 @@ func (s *CaptureService) Upload(req model.CaptureRequest, imageBytes []byte) (*m
 		req.FingerType,
 	)
 
-	if err := storage.UploadObject(context.Background(), cephKey, imageBytes); err != nil {
-		return nil, fmt.Errorf("failed to upload image to CEPH: %w", err)
+	// ----------------------------------------------------------------------
+	// TEMPORARY DEMO FALLBACK
+	// CEPH upload is temporarily disabled because the CEPH endpoint is
+	// currently unreachable from the development environment.
+	// Once CEPH connectivity is restored, uncomment the code below and
+	// remove the local storage fallback.
+	// ----------------------------------------------------------------------
+	/*
+		if err := storage.UploadObject(context.Background(), cephKey, imageBytes); err != nil {
+			return nil, fmt.Errorf("failed to upload image to CEPH: %w", err)
+		}
+	*/
+
+	if err := storage.SaveObjectLocally(context.Background(), cephKey, imageBytes); err != nil {
+		return nil, fmt.Errorf("failed to save image locally: %w", err)
 	}
 
 	capture, err := s.captureRepo.Insert(req, cephKey)

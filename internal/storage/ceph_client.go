@@ -5,6 +5,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -61,6 +64,58 @@ func UploadObject(ctx context.Context, objectKey string, data []byte) error {
 		Body:   bytes.NewReader(data),
 	})
 	return err
+}
+
+// SaveObjectLocally is a temporary demo fallback while CEPH connectivity is
+// unavailable. It stores the same generated object key under uploads/ on the
+// backend filesystem and must be removed once CEPH uploads are restored.
+func SaveObjectLocally(ctx context.Context, objectKey string, data []byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	localPath, err := localUploadPath(objectKey)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
+		return fmt.Errorf("failed to create local upload directory: %w", err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(localPath, data, 0600); err != nil {
+		return fmt.Errorf("failed to save image locally: %w", err)
+	}
+
+	return nil
+}
+
+func localUploadPath(objectKey string) (string, error) {
+	cleaned := path.Clean(strings.TrimSpace(objectKey))
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	if cleaned == "." || cleaned == "" {
+		return "", fmt.Errorf("invalid object key")
+	}
+
+	parts := strings.Split(cleaned, "/")
+	if len(parts) > 0 && parts[0] == "sitaa-clf" {
+		parts = parts[1:]
+	}
+	if len(parts) < 4 {
+		return "", fmt.Errorf("invalid object key path")
+	}
+
+	for _, part := range parts {
+		if part == "" || part == "." || part == ".." {
+			return "", fmt.Errorf("invalid object key path segment")
+		}
+	}
+
+	return filepath.Join(append([]string{"uploads"}, parts...)...), nil
 }
 
 // TestConnection verifies connectivity by attempting to head the bucket.
