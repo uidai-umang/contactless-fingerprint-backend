@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	_ "github.com/lib/pq" // registers postgres driver with database/sql
 )
@@ -32,6 +33,14 @@ func Connect() {
 	if err != nil {
 		log.Fatalf("Error opening database: %v", err)
 	}
+
+	// Connection pool limits — without these, Go's defaults (unlimited open
+	// connections, only 2 idle) cause unpredictable latency under concurrent
+	// load, since every burst of requests fights for new connections instead
+	// of reusing a stable pool.
+	DB.SetMaxOpenConns(25)                 // hard cap on concurrent connections
+	DB.SetMaxIdleConns(10)                 // keep some warm connections ready to reuse
+	DB.SetConnMaxLifetime(5 * time.Minute) // recycle connections periodically
 
 	// .Ping() verifies that the database is reachable and the connection is valid.
 	err = DB.Ping()
