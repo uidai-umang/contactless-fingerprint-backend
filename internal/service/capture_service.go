@@ -12,15 +12,18 @@ import (
 type CaptureService struct {
 	captureRepo *repository.CaptureRepository
 	sessionRepo *repository.SessionRepository
+	imageStore  storage.ImageStore
 }
 
 func NewCaptureService(
 	captureRepo *repository.CaptureRepository,
 	sessionRepo *repository.SessionRepository,
+	imageStore storage.ImageStore,
 ) *CaptureService {
 	return &CaptureService{
 		captureRepo: captureRepo,
 		sessionRepo: sessionRepo,
+		imageStore:  imageStore,
 	}
 }
 
@@ -41,31 +44,18 @@ func (s *CaptureService) Upload(req model.CaptureRequest, imageBytes []byte) (*m
 		return nil, repository.ErrDuplicateCapture
 	}
 
-	cephKey := repository.GenerateCephKey(
+	storageKey := repository.GenerateCephKey(
 		session.CentreID,
 		req.ResidentPseudonymID,
 		req.SessionID,
 		req.FingerType,
 	)
 
-	// ----------------------------------------------------------------------
-	// TEMPORARY DEMO FALLBACK
-	// CEPH upload is temporarily disabled because the CEPH endpoint is
-	// currently unreachable from the development environment.
-	// Once CEPH connectivity is restored, uncomment the code below and
-	// remove the local storage fallback.
-	// ----------------------------------------------------------------------
-	/*
-		if err := storage.UploadObject(context.Background(), cephKey, imageBytes); err != nil {
-			return nil, fmt.Errorf("failed to upload image to CEPH: %w", err)
-		}
-	*/
-
-	if err := storage.SaveObjectLocally(context.Background(), cephKey, imageBytes); err != nil {
-		return nil, fmt.Errorf("failed to save image locally: %w", err)
+	if err := s.imageStore.Save(context.Background(), storageKey, imageBytes); err != nil {
+		return nil, fmt.Errorf("failed to save image: %w", err)
 	}
 
-	capture, err := s.captureRepo.Insert(req, cephKey)
+	capture, err := s.captureRepo.Insert(req, storageKey)
 	if err != nil {
 		return nil, err
 	}

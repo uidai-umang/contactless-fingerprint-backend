@@ -59,6 +59,8 @@ func main() {
 	// gin.Default() includes Logger and Recovery middleware
 	router := gin.Default()
 
+	imageStore := storage.NewLocalStore()
+
 	// ── Dependency injection ──────────────────────────────────────────────
 	// Repositories — talk to DB
 	residentRepo := repository.NewResidentRepository(db.DB)
@@ -68,7 +70,7 @@ func main() {
 	// Services — business logic
 	residentService := service.NewResidentService(residentRepo, captureRepo)
 	sessionService := service.NewSessionService(sessionRepo)
-	captureService := service.NewCaptureService(captureRepo, sessionRepo)
+	captureService := service.NewCaptureService(captureRepo, sessionRepo, imageStore)
 
 	// Handlers — HTTP layer
 	residentHandler := handler.NewResidentHandler(residentService)
