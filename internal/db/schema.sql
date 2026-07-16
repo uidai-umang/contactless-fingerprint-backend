@@ -23,6 +23,36 @@ CREATE TABLE IF NOT EXISTS operators (
     last_login_at TIMESTAMP
 );
 
+-- Stores camera hardware specifications, deduped by fingerprint hash.
+-- One row covers every device sharing the same physical camera module —
+-- static properties (sensor size, focal length, etc.) never change per
+-- device or per capture, so they live here once, not repeated elsewhere.
+CREATE TABLE IF NOT EXISTS camera_specs (
+    camera_spec_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    fingerprint_hash VARCHAR(64) UNIQUE NOT NULL,  -- hash of manufacturer+model+
+                                                     -- hardware_level+sensor_size+
+                                                     -- focal_length+aperture+camera_id
+    camera_id VARCHAR(10),
+    lens_facing VARCHAR(10),
+    hardware_level VARCHAR(20),
+    sensor_physical_size_mm VARCHAR(30),
+    sensor_active_array_size VARCHAR(30),
+    pixel_array_size VARCHAR(30),
+    focal_length_mm FLOAT,
+    aperture FLOAT,
+    min_focus_distance_diopters FLOAT,
+    hyperfocal_distance_diopters FLOAT,
+    has_flash BOOLEAN,
+    has_ois BOOLEAN,
+    max_digital_zoom FLOAT,
+    sensor_orientation INT,
+    supports_raw BOOLEAN,
+    af_modes INTEGER[],
+    ae_modes INTEGER[],
+    awb_modes INTEGER[],
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Stores devices registered to an operator
 CREATE TABLE IF NOT EXISTS devices (
     device_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -35,7 +65,12 @@ CREATE TABLE IF NOT EXISTS devices (
     play_integrity_status VARCHAR(20),
     is_flagged BOOLEAN DEFAULT FALSE,
     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_seen_at TIMESTAMP
+    last_seen_at TIMESTAMP,
+    camera_spec_id UUID REFERENCES camera_specs(camera_spec_id),
+    android_sdk_version INT,
+    android_security_patch VARCHAR(20),
+    soc_model VARCHAR(255),
+    ram_total_mb INT
 );
 
 -- Stores resident pseudonym records — no PII stored
@@ -99,7 +134,21 @@ CREATE TABLE IF NOT EXISTS captures (
     upload_status VARCHAR(20) DEFAULT 'PENDING' CHECK (upload_status IN ('PENDING', 'UPLOADED', 'FAILED')),
     upload_attempts INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    uploaded_at TIMESTAMP
+    uploaded_at TIMESTAMP,
+    device_id UUID REFERENCES devices(device_id),
+    camera_focus_mode VARCHAR(30),
+    camera_focus_distance_diopters FLOAT,
+    camera_af_state VARCHAR(30),
+    camera_ae_state VARCHAR(30),
+    camera_awb_state VARCHAR(30),
+    camera_iso INT,
+    camera_exposure_time_ns BIGINT,
+    camera_frame_duration_ns BIGINT,
+    camera_zoom_ratio FLOAT,
+    camera_flash_state VARCHAR(20),
+    camera_rotation INT,
+    capture_strategy VARCHAR(20),
+    focus_type VARCHAR(50)
 );
 
 -- Prevents two UPLOADED rows for the same resident+finger_type (eliminates check-then-insert race)
@@ -125,6 +174,5 @@ CREATE INDEX IF NOT EXISTS idx_captures_resident ON captures(resident_pseudonym_
 CREATE INDEX IF NOT EXISTS idx_sessions_operator ON sessions(operator_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_session ON audit_logs(session_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_operator ON audit_logs(operator_id);
-
-
-
+CREATE INDEX IF NOT EXISTS idx_devices_camera_spec ON devices(camera_spec_id);
+CREATE INDEX IF NOT EXISTS idx_captures_device ON captures(device_id);
