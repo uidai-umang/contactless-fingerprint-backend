@@ -20,9 +20,9 @@ type CameraSpec struct {
 	MaxDigitalZoom             float64   `json:"max_digital_zoom"`
 	SensorOrientation          int       `json:"sensor_orientation"`
 	SupportsRaw                bool      `json:"supports_raw"`
-	AfModes                    []int     `json:"af_modes"`
-	AeModes                    []int     `json:"ae_modes"`
-	AwbModes                   []int     `json:"awb_modes"`
+	AfModes                    []int64   `json:"af_modes"`
+	AeModes                    []int64   `json:"ae_modes"`
+	AwbModes                   []int64   `json:"awb_modes"`
 	CreatedAt                  time.Time `json:"created_at"`
 }
 
@@ -77,7 +77,7 @@ type DeviceRegistrationRequest struct {
 	MaxDigitalZoom             float64 `json:"max_digital_zoom"`
 	SensorOrientation          int     `json:"sensor_orientation"`
 	SupportsRaw                bool    `json:"supports_raw"`
-	AfModes                    []int   `json:"af_modes"`
-	AeModes                    []int   `json:"ae_modes"`
-	AwbModes                   []int   `json:"awb_modes"`
+	AfModes                    []int64 `json:"af_modes"`
+	AeModes                    []int64 `json:"ae_modes"`
+	AwbModes                   []int64 `json:"awb_modes"`
 }
