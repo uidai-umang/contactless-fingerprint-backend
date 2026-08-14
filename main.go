@@ -65,16 +65,20 @@ func main() {
 	residentRepo := repository.NewResidentRepository(db.DB)
 	sessionRepo := repository.NewSessionRepository(db.DB)
 	captureRepo := repository.NewCaptureRepository(db.DB)
+	cameraSpecRepo := repository.NewCameraSpecRepository(db.DB)
+	deviceRepo := repository.NewDeviceRepository(db.DB)
 
 	// Services — business logic
 	residentService := service.NewResidentService(residentRepo, captureRepo)
 	sessionService := service.NewSessionService(sessionRepo)
 	captureService := service.NewCaptureService(captureRepo, sessionRepo, imageStore)
+	deviceService := service.NewDeviceService(deviceRepo, cameraSpecRepo)
 
 	// Handlers — HTTP layer
 	residentHandler := handler.NewResidentHandler(residentService)
 	sessionHandler := handler.NewSessionHandler(sessionService)
 	captureHandler := handler.NewCaptureHandler(captureService)
+	deviceHandler := handler.NewDeviceHandler(deviceService)
 
 	// ── Routes ───────────────────────────────────────────────────────────
 	api := router.Group("/api/v1")
@@ -100,6 +104,10 @@ func main() {
 
 		// Dev/test only — reset resident data
 		api.DELETE("/dev/reset", residentHandler.Reset)
+
+		// Routes — inside the api group
+		api.POST("/devices/register", deviceHandler.Register)
+
 	}
 
 	port := os.Getenv("SERVER_PORT")

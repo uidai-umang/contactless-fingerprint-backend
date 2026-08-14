@@ -23,21 +23,6 @@ type Operator struct {
 	LastLoginAt *time.Time `json:"last_login_at"`
 }
 
-// Device represents an AMAPI managed device registered to an operator
-type Device struct {
-	DeviceID            string     `json:"device_id"`
-	OperatorID          string     `json:"operator_id"`
-	AndroidID           string     `json:"android_id"`
-	DeviceFingerprint   string     `json:"device_fingerprint"`
-	DeviceModel         string     `json:"device_model"`
-	DeviceManufacturer  string     `json:"device_manufacturer"`
-	OsVersion           string     `json:"os_version"`
-	PlayIntegrityStatus string     `json:"play_integrity_status"`
-	IsFlagged           bool       `json:"is_flagged"`
-	RegisteredAt        time.Time  `json:"registered_at"`
-	LastSeenAt          *time.Time `json:"last_seen_at"`
-}
-
 // Resident represents a pseudonymised resident — no PII stored
 type Resident struct {
 	ResidentPseudonymID string    `json:"resident_pseudonym_id"`
