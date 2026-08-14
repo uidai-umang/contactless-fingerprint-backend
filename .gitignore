@@ -4,3 +4,5 @@
 /vendor
 .DS_Store
 /uploads
+certificate.pem
+private_key.pem

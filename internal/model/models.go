@@ -141,6 +141,10 @@ type CaptureRequest struct {
 	CameraModel         string  `json:"camera_model"`
 	CameraResolution    string  `json:"camera_resolution"`
 	DeviceModel         string  `json:"device_model"`
+	EncryptedSessionKey string  `json:"encrypted_session_key" binding:"required"`
+	IV                  string  `json:"iv" binding:"required"`
+	Hmac                string  `json:"hmac" binding:"required"`
+	Thumbprint          string  `json:"thumbprint" binding:"required"`
 }
 
 // BatchCaptureRequest wraps multiple captures in one request
