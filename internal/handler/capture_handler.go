@@ -92,6 +92,10 @@ func (h *CaptureHandler) Upload(ctx *gin.Context) {
 		CameraModel:         ctx.Request.FormValue("camera_model"),
 		CameraResolution:    ctx.Request.FormValue("camera_resolution"),
 		DeviceModel:         ctx.Request.FormValue("device_model"),
+		EncryptedSessionKey: ctx.Request.FormValue("encrypted_session_key"),
+		IV:                  ctx.Request.FormValue("iv"),
+		Hmac:                ctx.Request.FormValue("hmac"),
+		Thumbprint:          ctx.Request.FormValue("thumbprint"),
 	}
 
 	if statusCode, msg, data := validateCaptureRequest(req); msg != "" {
@@ -192,6 +196,10 @@ func (h *CaptureHandler) BatchUpload(ctx *gin.Context) {
 			CameraModel:         getFormValue(form.Value, "camera_model_"+idx),
 			CameraResolution:    getFormValue(form.Value, "camera_resolution_"+idx),
 			DeviceModel:         getFormValue(form.Value, "device_model_"+idx),
+			EncryptedSessionKey: getFormValue(form.Value, "encrypted_session_key_"+idx),
+			IV:                  getFormValue(form.Value, "iv_"+idx),
+			Hmac:                getFormValue(form.Value, "hmac_"+idx),
+			Thumbprint:          getFormValue(form.Value, "thumbprint_"+idx),
 		}
 
 		if statusCode, msg, _ := validateCaptureRequest(req); msg != "" {
@@ -239,6 +247,19 @@ func validateCaptureRequest(req model.CaptureRequest) (int, string, interface{})
 	}
 	if req.OperatorID == "" {
 		return http.StatusBadRequest, "operator_id is required", nil
+	}
+
+	if req.EncryptedSessionKey == "" {
+		return http.StatusBadRequest, "encrypted_session_key is required", nil
+	}
+	if req.IV == "" {
+		return http.StatusBadRequest, "iv is required", nil
+	}
+	if req.Hmac == "" {
+		return http.StatusBadRequest, "hmac is required", nil
+	}
+	if req.Thumbprint == "" {
+		return http.StatusBadRequest, "thumbprint is required", nil
 	}
 
 	if req.FingerType == "" {
@@ -300,6 +321,10 @@ func captureValidationField(statusCode int, req model.CaptureRequest) string {
 
 // mapCaptureError writes the correct error response for service-layer errors.
 func mapCaptureError(ctx *gin.Context, err error) {
+	if errors.Is(err, service.ErrDecryptionFailed) {
+		respondError(ctx, http.StatusBadRequest, "Failed to decrypt uploaded image")
+		return
+	}
 	if errors.Is(err, repository.ErrNotFound) {
 		respondError(ctx, http.StatusNotFound, "Session not found")
 		return

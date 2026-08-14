@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
+	"contactless-fingerprint-backend/internal/crypto"
 	"contactless-fingerprint-backend/internal/db"
 	"contactless-fingerprint-backend/internal/handler"
 	"contactless-fingerprint-backend/internal/repository"
@@ -60,6 +61,20 @@ func main() {
 
 	imageStore := storage.NewLocalStore()
 
+	privateKeyPEM, err := os.ReadFile(os.Getenv("RSA_PRIVATE_KEY_PATH"))
+	if err != nil {
+		log.Fatalf("Failed to read private key: %v", err)
+	}
+	certPEM, err := os.ReadFile(os.Getenv("RSA_CERTIFICATE_PATH"))
+	if err != nil {
+		log.Fatalf("Failed to read certificate: %v", err)
+	}
+	keyPair, err := crypto.LoadKeyPairFromPEM(privateKeyPEM, certPEM)
+	if err != nil {
+		log.Fatalf("Failed to load key pair: %v", err)
+	}
+	decrypter := crypto.NewDecrypter(keyPair)
+
 	// ── Dependency injection ──────────────────────────────────────────────
 	// Repositories — talk to DB
 	residentRepo := repository.NewResidentRepository(db.DB)
@@ -71,7 +86,7 @@ func main() {
 	// Services — business logic
 	residentService := service.NewResidentService(residentRepo, captureRepo)
 	sessionService := service.NewSessionService(sessionRepo)
-	captureService := service.NewCaptureService(captureRepo, sessionRepo, imageStore)
+	captureService := service.NewCaptureService(captureRepo, sessionRepo, imageStore, decrypter)
 	deviceService := service.NewDeviceService(deviceRepo, cameraSpecRepo)
 
 	// Handlers — HTTP layer
