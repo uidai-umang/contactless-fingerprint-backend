@@ -82,18 +82,24 @@ func main() {
 	captureRepo := repository.NewCaptureRepository(db.DB)
 	cameraSpecRepo := repository.NewCameraSpecRepository(db.DB)
 	deviceRepo := repository.NewDeviceRepository(db.DB)
+	dashboardRepo := repository.NewDashboardRepository(db.DB)
+	quotaRepo := repository.NewQuotaRepository(db.DB)
 
 	// Services — business logic
 	residentService := service.NewResidentService(residentRepo, captureRepo)
 	sessionService := service.NewSessionService(sessionRepo)
 	captureService := service.NewCaptureService(captureRepo, sessionRepo, imageStore, decrypter)
 	deviceService := service.NewDeviceService(deviceRepo, cameraSpecRepo)
+	dashboardService := service.NewDashboardService(dashboardRepo)
+	quotaService := service.NewQuotaService(quotaRepo)
 
 	// Handlers — HTTP layer
 	residentHandler := handler.NewResidentHandler(residentService)
 	sessionHandler := handler.NewSessionHandler(sessionService)
 	captureHandler := handler.NewCaptureHandler(captureService)
 	deviceHandler := handler.NewDeviceHandler(deviceService)
+	dashboardHandler := handler.NewDashboardHandler(dashboardService, quotaService)
+	quotaHandler := handler.NewQuotaHandler(quotaService)
 
 	// ── Routes ───────────────────────────────────────────────────────────
 	api := router.Group("/api/v1")
@@ -122,6 +128,16 @@ func main() {
 
 		// Routes — inside the api group
 		api.POST("/devices/register", deviceHandler.Register)
+
+		// Dashboard routes
+		api.GET("/dashboard/overview", dashboardHandler.Overview)
+		api.GET("/dashboard/diversity", dashboardHandler.Diversity)
+		api.GET("/dashboard/fingers", dashboardHandler.Fingers)
+		api.GET("/dashboard/alerts", dashboardHandler.Alerts)
+
+		// Quota routes
+		api.GET("/quota/check", quotaHandler.Check)
+		api.POST("/quota/override", quotaHandler.LogOverride)
 
 	}
 

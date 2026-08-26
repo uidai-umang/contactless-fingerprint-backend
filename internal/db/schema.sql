@@ -176,3 +176,26 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_session ON audit_logs(session_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_operator ON audit_logs(operator_id);
 CREATE INDEX IF NOT EXISTS idx_devices_camera_spec ON devices(camera_spec_id);
 CREATE INDEX IF NOT EXISTS idx_captures_device ON captures(device_id);
+
+-- Stores national capture targets per demographic dimension/key
+CREATE TABLE IF NOT EXISTS quota_targets (
+    dimension VARCHAR(20) CHECK (dimension IN ('GENDER', 'AGE_GROUP')),
+    key VARCHAR(20) NOT NULL,
+    target_count INTEGER CHECK (target_count >= 0),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (dimension, key)
+);
+
+-- Records each time an operator captures a resident against a full/near-full quota bracket
+CREATE TABLE IF NOT EXISTS quota_overrides (
+    override_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID NOT NULL REFERENCES sessions(session_id),
+    resident_pseudonym_id UUID NOT NULL REFERENCES residents(resident_pseudonym_id),
+    operator_id UUID NOT NULL REFERENCES operators(operator_id),
+    dimension VARCHAR(20) CHECK (dimension IN ('GENDER', 'AGE_GROUP')),
+    key VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_quota_overrides_dimension_key ON quota_overrides(dimension, key);
+CREATE INDEX IF NOT EXISTS idx_quota_overrides_operator ON quota_overrides(operator_id);
