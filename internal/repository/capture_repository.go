@@ -35,9 +35,40 @@ func (r *CaptureRepository) ExistsUploaded(sessionID, residentPseudonymID, finge
 	return exists, err
 }
 
+// ExistsUploadedTx is ExistsUploaded run inside an existing transaction, so
+// the duplicate check is consistent with the capture-mode lock/set taken in
+// the same transaction (see ResidentRepository.LockCaptureModeTx).
+func (r *CaptureRepository) ExistsUploadedTx(tx *sql.Tx, sessionID, residentPseudonymID, fingerType string) (bool, error) {
+	var exists bool
+	err := tx.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1 FROM captures
+			WHERE session_id = $1
+			  AND resident_pseudonym_id = $2
+			  AND finger_type = $3
+			  AND upload_status = 'UPLOADED'
+		)
+	`, sessionID, residentPseudonymID, fingerType).Scan(&exists)
+	return exists, err
+}
+
 // Insert saves a single capture record and returns it with generated capture_id.
 // Returns *ErrForeignKeyViolation if any referenced FK does not exist.
 func (r *CaptureRepository) Insert(req model.CaptureRequest, cephKey string) (*model.Capture, error) {
+	return r.insert(r.db, req, cephKey)
+}
+
+// InsertTx is Insert run inside an existing transaction.
+func (r *CaptureRepository) InsertTx(tx *sql.Tx, req model.CaptureRequest, cephKey string) (*model.Capture, error) {
+	return r.insert(tx, req, cephKey)
+}
+
+// queryRower is satisfied by both *sql.DB and *sql.Tx.
+type queryRower interface {
+	QueryRow(query string, args ...interface{}) *sql.Row
+}
+
+func (r *CaptureRepository) insert(q queryRower, req model.CaptureRequest, cephKey string) (*model.Capture, error) {
 	capture := &model.Capture{}
 
 	query := `
@@ -60,7 +91,7 @@ func (r *CaptureRepository) Insert(req model.CaptureRequest, cephKey string) (*m
 		          device_model, upload_status, created_at
 	`
 
-	err := r.db.QueryRow(query,
+	err := q.QueryRow(query,
 		req.SessionID,
 		req.ResidentPseudonymID,
 		req.OperatorID,
