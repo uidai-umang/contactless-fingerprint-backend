@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS residents (
     age_group VARCHAR(20) CHECK (age_group IN ('5-17', '18-40', '41-60', '60+')),
     gender VARCHAR(10) CHECK (gender IN ('MALE', 'FEMALE', 'OTHER')),
     skin_tone VARCHAR(50),
+    capture_mode VARCHAR(20) CHECK (capture_mode IN ('SEQUENTIAL', 'SLAP')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
