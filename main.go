@@ -88,7 +88,7 @@ func main() {
 	// Services — business logic
 	residentService := service.NewResidentService(residentRepo, captureRepo)
 	sessionService := service.NewSessionService(sessionRepo)
-	captureService := service.NewCaptureService(captureRepo, sessionRepo, imageStore, decrypter)
+	captureService := service.NewCaptureService(db.DB, captureRepo, sessionRepo, residentRepo, imageStore, decrypter)
 	deviceService := service.NewDeviceService(deviceRepo, cameraSpecRepo)
 	dashboardService := service.NewDashboardService(dashboardRepo)
 	quotaService := service.NewQuotaService(quotaRepo)
