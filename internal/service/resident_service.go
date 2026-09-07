@@ -46,11 +46,18 @@ func (s *ResidentService) FindOrCreateResident(req model.ResidentLookupRequest) 
 		}
 	}
 
-	// Complete only when all 10 fingers are captured
-	isComplete := len(capturedFingers) >= 10
+	// Required count depends on which mode this resident is locked into.
+	// Unset (no captures yet) defaults to the SEQUENTIAL count — harmless,
+	// since len(capturedFingers) is 0 either way at that point.
+	requiredCount := 10
+	if resident.CaptureMode == model.CaptureModeSlap {
+		requiredCount = 4
+	}
+	isComplete := len(capturedFingers) >= requiredCount
 
 	return &model.ResidentLookupResponse{
 		ResidentPseudonymID: resident.ResidentPseudonymID,
+		CaptureMode:         resident.CaptureMode,
 		CapturedFingers:     capturedFingers,
 		PendingUploads:      pendingUploads,
 		TotalCaptured:       len(capturedFingers),
