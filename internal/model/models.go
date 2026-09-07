@@ -30,25 +30,21 @@ type Resident struct {
 	AgeGroup            string    `json:"age_group"`
 	Gender              string    `json:"gender"`
 	SkinTone            string    `json:"skin_tone"`
-	CaptureMode         string    `json:"capture_mode"`
+	CaptureMode         string    `json:"capture_mode"` // "" until first capture sets it
 	CreatedAt           time.Time `json:"created_at"`
 }
 
 // Capture mode is decided by the resident's first successful capture and is
 // permanent for the rest of their enrollment — a resident can never mix
 // SEQUENTIAL (10 individual fingers) and SLAP (4-item slap) captures.
+// The client declares which mode a given capture belongs to
+// (CaptureRequest.CaptureMode) rather than the backend inferring it from
+// finger_type, because LEFT_THUMB/RIGHT_THUMB are valid in both modes and
+// can't be used to tell them apart.
 const (
 	CaptureModeSequential = "SEQUENTIAL"
 	CaptureModeSlap       = "SLAP"
 )
-
-// IsSlapFingerType reports whether a finger_type value belongs to slap
-// capture mode. LEFT_THUMB/RIGHT_THUMB are shared between both modes, so
-// mode is NOT derivable from finger_type alone for every value — only the
-// two slap-specific values below decide it.
-func IsSlapFingerType(fingerType string) bool {
-	return fingerType == "LEFT_SLAP" || fingerType == "RIGHT_SLAP"
-}
 
 // Session represents one data collection session per resident per operator
 type Session struct {
@@ -130,7 +126,7 @@ type ResidentLookupResponse struct {
 	CapturedFingers     []string `json:"captured_fingers"` // fingers already done
 	PendingUploads      []string `json:"pending_uploads"`  // captures pending upload
 	TotalCaptured       int      `json:"total_captured"`
-	IsComplete          bool     `json:"is_complete"` // true if 6+ fingers done
+	IsComplete          bool     `json:"is_complete"` // true once capture_mode's required count is reached
 }
 
 // CreateSessionRequest is sent when starting a new capture session
@@ -147,6 +143,7 @@ type CaptureRequest struct {
 	SessionID           string  `json:"session_id" binding:"required"`
 	ResidentPseudonymID string  `json:"resident_pseudonym_id" binding:"required"`
 	OperatorID          string  `json:"operator_id" binding:"required"`
+	CaptureMode         string  `json:"capture_mode" binding:"required"` // SEQUENTIAL | SLAP — declared by client, not inferred
 	FingerType          string  `json:"finger_type" binding:"required"`
 	Hand                string  `json:"hand" binding:"required"`
 	Nfiq2Score          float64 `json:"nfiq2_score"`
