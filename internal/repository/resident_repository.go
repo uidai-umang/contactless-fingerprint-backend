@@ -20,8 +20,8 @@ func (r *ResidentRepository) FindOrCreateByAadhaarHash(req model.ResidentLookupR
 	var captureMode sql.NullString
 
 	// Try to find existing residnet by aadhaar_hash
-	query := ` 
-	SELECT resident_pseudonym_id, aadhaar_hash, age_group, gender, skin_tone, created_at
+	query := `
+	SELECT resident_pseudonym_id, aadhaar_hash, age_group, gender, skin_tone, capture_mode, created_at
 	FROM residents
 	WHERE aadhaar_hash = $1
 	`
@@ -61,6 +61,7 @@ func (r *ResidentRepository) FindOrCreateByAadhaarHash(req model.ResidentLookupR
 			return nil, err
 		}
 
+		resident.CaptureMode = captureMode.String
 		return resident, nil
 	}
 
@@ -68,6 +69,7 @@ func (r *ResidentRepository) FindOrCreateByAadhaarHash(req model.ResidentLookupR
 		return nil, err
 	}
 
+	resident.CaptureMode = captureMode.String
 	return resident, nil
 }
 
