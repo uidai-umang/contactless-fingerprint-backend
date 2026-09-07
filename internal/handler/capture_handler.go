@@ -32,12 +32,30 @@ var validFingerTypes = map[string]bool{
 	"RIGHT_MIDDLE": true,
 	"RIGHT_RING":   true,
 	"RIGHT_LITTLE": true,
+	// Slap mode — LEFT_THUMB/RIGHT_THUMB above are shared with slap mode too.
+	"LEFT_SLAP":  true,
+	"RIGHT_SLAP": true,
 }
 
 var allowedFingerTypes = []string{
 	"LEFT_THUMB", "LEFT_INDEX", "LEFT_MIDDLE", "LEFT_RING", "LEFT_LITTLE",
 	"RIGHT_THUMB", "RIGHT_INDEX", "RIGHT_MIDDLE", "RIGHT_RING", "RIGHT_LITTLE",
+	"LEFT_SLAP", "RIGHT_SLAP",
 }
+
+// sequentialFingerTypes / slapFingerTypes narrow validFingerTypes down to
+// what's actually legal for a given capture_mode. LEFT_THUMB/RIGHT_THUMB
+// appear in both — they're captured individually under either mode.
+var sequentialFingerTypes = map[string]bool{
+	"LEFT_THUMB": true, "LEFT_INDEX": true, "LEFT_MIDDLE": true, "LEFT_RING": true, "LEFT_LITTLE": true,
+	"RIGHT_THUMB": true, "RIGHT_INDEX": true, "RIGHT_MIDDLE": true, "RIGHT_RING": true, "RIGHT_LITTLE": true,
+}
+
+var slapFingerTypes = map[string]bool{
+	"LEFT_SLAP": true, "RIGHT_SLAP": true, "LEFT_THUMB": true, "RIGHT_THUMB": true,
+}
+
+var allowedCaptureModes = []string{model.CaptureModeSequential, model.CaptureModeSlap}
 
 var validHands = map[string]bool{
 	"LEFT":  true,
@@ -80,6 +98,7 @@ func (h *CaptureHandler) Upload(ctx *gin.Context) {
 		SessionID:           ctx.Request.FormValue("session_id"),
 		ResidentPseudonymID: ctx.Request.FormValue("resident_pseudonym_id"),
 		OperatorID:          ctx.Request.FormValue("operator_id"),
+		CaptureMode:         ctx.Request.FormValue("capture_mode"),
 		FingerType:          ctx.Request.FormValue("finger_type"),
 		Hand:                ctx.Request.FormValue("hand"),
 		Nfiq2Score:          nfiq2Score,
@@ -184,6 +203,7 @@ func (h *CaptureHandler) BatchUpload(ctx *gin.Context) {
 			SessionID:           getFormValue(form.Value, "session_id_"+idx),
 			ResidentPseudonymID: getFormValue(form.Value, "resident_pseudonym_id_"+idx),
 			OperatorID:          getFormValue(form.Value, "operator_id_"+idx),
+			CaptureMode:         getFormValue(form.Value, "capture_mode_"+idx),
 			FingerType:          getFormValue(form.Value, "finger_type_"+idx),
 			Hand:                getFormValue(form.Value, "hand_"+idx),
 			Nfiq2Score:          nfiq2Score,
@@ -262,6 +282,15 @@ func validateCaptureRequest(req model.CaptureRequest) (int, string, interface{})
 		return http.StatusBadRequest, "thumbprint is required", nil
 	}
 
+	if req.CaptureMode == "" {
+		return http.StatusBadRequest, "capture_mode is required",
+			gin.H{"allowed_values": allowedCaptureModes}
+	}
+	if req.CaptureMode != model.CaptureModeSequential && req.CaptureMode != model.CaptureModeSlap {
+		return http.StatusBadRequest, "Invalid capture_mode value",
+			gin.H{"allowed_values": allowedCaptureModes}
+	}
+
 	if req.FingerType == "" {
 		return http.StatusBadRequest, "finger_type is required",
 			gin.H{"allowed_values": allowedFingerTypes}
@@ -269,6 +298,14 @@ func validateCaptureRequest(req model.CaptureRequest) (int, string, interface{})
 	if !validFingerTypes[req.FingerType] {
 		return http.StatusBadRequest, "Invalid finger_type value",
 			gin.H{"allowed_values": allowedFingerTypes}
+	}
+	if req.CaptureMode == model.CaptureModeSlap && !slapFingerTypes[req.FingerType] {
+		return http.StatusUnprocessableEntity, "finger_type is not valid for SLAP capture_mode",
+			gin.H{"allowed_values": []string{"LEFT_SLAP", "RIGHT_SLAP", "LEFT_THUMB", "RIGHT_THUMB"}}
+	}
+	if req.CaptureMode == model.CaptureModeSequential && !sequentialFingerTypes[req.FingerType] {
+		return http.StatusUnprocessableEntity, "finger_type is not valid for SEQUENTIAL capture_mode",
+			gin.H{"allowed_values": allowedFingerTypes[:10]}
 	}
 
 	if req.Hand == "" {
@@ -308,7 +345,13 @@ func captureValidationField(statusCode int, req model.CaptureRequest) string {
 		return "resident_pseudonym_id"
 	case req.OperatorID == "":
 		return "operator_id"
+	case req.CaptureMode == "" || (req.CaptureMode != model.CaptureModeSequential && req.CaptureMode != model.CaptureModeSlap):
+		return "capture_mode"
 	case req.FingerType == "" || !validFingerTypes[req.FingerType]:
+		return "finger_type"
+	case req.CaptureMode == model.CaptureModeSlap && !slapFingerTypes[req.FingerType]:
+		return "finger_type"
+	case req.CaptureMode == model.CaptureModeSequential && !sequentialFingerTypes[req.FingerType]:
 		return "finger_type"
 	case req.Hand == "" || !validHands[req.Hand]:
 		return "hand"
@@ -331,6 +374,10 @@ func mapCaptureError(ctx *gin.Context, err error) {
 	}
 	if errors.Is(err, repository.ErrDuplicateCapture) {
 		respondError(ctx, http.StatusConflict, "This finger has already been captured for this session")
+		return
+	}
+	if errors.Is(err, repository.ErrCaptureModeMismatch) {
+		respondError(ctx, http.StatusConflict, "This resident is already enrolled in a different capture mode")
 		return
 	}
 	var fkErr *repository.ErrForeignKeyViolation
