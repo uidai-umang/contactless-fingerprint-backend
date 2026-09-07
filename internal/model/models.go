@@ -30,7 +30,24 @@ type Resident struct {
 	AgeGroup            string    `json:"age_group"`
 	Gender              string    `json:"gender"`
 	SkinTone            string    `json:"skin_tone"`
+	CaptureMode         string    `json:"capture_mode"`
 	CreatedAt           time.Time `json:"created_at"`
+}
+
+// Capture mode is decided by the resident's first successful capture and is
+// permanent for the rest of their enrollment — a resident can never mix
+// SEQUENTIAL (10 individual fingers) and SLAP (4-item slap) captures.
+const (
+	CaptureModeSequential = "SEQUENTIAL"
+	CaptureModeSlap       = "SLAP"
+)
+
+// IsSlapFingerType reports whether a finger_type value belongs to slap
+// capture mode. LEFT_THUMB/RIGHT_THUMB are shared between both modes, so
+// mode is NOT derivable from finger_type alone for every value — only the
+// two slap-specific values below decide it.
+func IsSlapFingerType(fingerType string) bool {
+	return fingerType == "LEFT_SLAP" || fingerType == "RIGHT_SLAP"
 }
 
 // Session represents one data collection session per resident per operator
@@ -109,6 +126,7 @@ type ResidentLookupRequest struct {
 // ResidentLookupResponse returns resident info and session progress
 type ResidentLookupResponse struct {
 	ResidentPseudonymID string   `json:"resident_pseudonym_id"`
+	CaptureMode         string   `json:"capture_mode"`
 	CapturedFingers     []string `json:"captured_fingers"` // fingers already done
 	PendingUploads      []string `json:"pending_uploads"`  // captures pending upload
 	TotalCaptured       int      `json:"total_captured"`
