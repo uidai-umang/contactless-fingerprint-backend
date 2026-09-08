@@ -8,6 +8,7 @@ import (
 var ErrNotFound = errors.New("record not found")
 var ErrDuplicateCapture = errors.New("this finger has already been captured for this session")
 var ErrSessionAlreadyClosed = errors.New("session is already closed")
+var ErrCaptureModeMismatch = errors.New("resident is already enrolled in a different capture mode")
 
 // ErrForeignKeyViolation is returned when an INSERT references a non-existent foreign key.
 type ErrForeignKeyViolation struct {
