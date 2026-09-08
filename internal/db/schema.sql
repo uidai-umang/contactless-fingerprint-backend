@@ -115,9 +115,10 @@ CREATE TABLE IF NOT EXISTS captures (
     session_id UUID NOT NULL REFERENCES sessions(session_id),
     resident_pseudonym_id UUID NOT NULL REFERENCES residents(resident_pseudonym_id),
     operator_id UUID NOT NULL REFERENCES operators(operator_id),
-    finger_type VARCHAR(20) CHECK (finger_type IN (
+        finger_type VARCHAR(20) CHECK (finger_type IN (
         'LEFT_THUMB', 'LEFT_INDEX', 'LEFT_MIDDLE', 'LEFT_RING', 'LEFT_LITTLE',
-        'RIGHT_THUMB', 'RIGHT_INDEX', 'RIGHT_MIDDLE', 'RIGHT_RING', 'RIGHT_LITTLE'
+        'RIGHT_THUMB', 'RIGHT_INDEX', 'RIGHT_MIDDLE', 'RIGHT_RING', 'RIGHT_LITTLE',
+        'LEFT_SLAP', 'RIGHT_SLAP'
     )),
     hand VARCHAR(5) CHECK (hand IN ('LEFT', 'RIGHT')),
     nfiq2_score FLOAT,
