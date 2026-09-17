@@ -219,9 +219,8 @@ func (r *CaptureRepository) GetPendingByResidentID(residentID string) ([]model.C
 	return captures, nil
 }
 
-// GenerateCephKey builds the CEPH object storage path for an image
-func GenerateCephKey(centreID, residentID, sessionID, fingerType string) string {
+// GenerateCephKey builds the CEPH storage path: {residentID}/{fingerType}_{timestamp}.jp2
+func GenerateCephKey(residentID, fingerType string) string {
 	timestamp := time.Now().UTC().Format("20060102T150405")
-	return fmt.Sprintf("/sitaa-clf/%s/%s/%s/%s_%s.jp2",
-		centreID, residentID, sessionID, fingerType, timestamp)
+	return fmt.Sprintf("/sitaa-clf/%s/%s_%s.jp2", residentID, fingerType, timestamp)
 }

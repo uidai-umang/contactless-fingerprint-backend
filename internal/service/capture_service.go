@@ -100,9 +100,7 @@ func (s *CaptureService) Upload(req model.CaptureRequest, encryptedImageBytes []
 	}
 
 	storageKey := repository.GenerateCephKey(
-		session.CentreID,
 		req.ResidentPseudonymID,
-		req.SessionID,
 		req.FingerType,
 	)
 
