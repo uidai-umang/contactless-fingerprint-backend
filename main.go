@@ -102,7 +102,7 @@ func main() {
 	quotaHandler := handler.NewQuotaHandler(quotaService)
 
 	// ── Routes ───────────────────────────────────────────────────────────
-	api := router.Group("/api/v1")
+	api := router.Group("/clf/v1")
 	{
 		// Health check
 		api.GET("/health", func(ctx *gin.Context) {
