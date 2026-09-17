@@ -2,31 +2,19 @@ package model
 
 import "time"
 
-// Centre represents an ASK (Aadhaar Seva Kendra) collection centre
-type Centre struct {
-	CentreID  string    `json:"centre_id"`
-	Name      string    `json:"name"`
-	City      string    `json:"city"`
-	State     string    `json:"state"`
-	Region    string    `json:"region"`
-	IsActive  bool      `json:"is_active"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-// Operator represents a data collection operator linked to a centre
+// Operator represents a data collection operator
 type Operator struct {
 	OperatorID  string     `json:"operator_id"`
-	CentreID    string     `json:"centre_id"`
 	FaceAuthRef string     `json:"face_auth_ref"`
 	Status      string     `json:"status"`
 	CreatedAt   time.Time  `json:"created_at"`
 	LastLoginAt *time.Time `json:"last_login_at"`
 }
 
-// Resident represents a pseudonymised resident — no PII stored
+// Resident — no PII stored
 type Resident struct {
 	ResidentPseudonymID string    `json:"resident_pseudonym_id"`
-	AadhaarHash         string    `json:"-"` // never exposed in API responses
+	AadhaarHash         string    `json:"-"`
 	AgeGroup            string    `json:"age_group"`
 	Gender              string    `json:"gender"`
 	SkinTone            string    `json:"skin_tone"`
@@ -34,35 +22,16 @@ type Resident struct {
 	CreatedAt           time.Time `json:"created_at"`
 }
 
-// Capture mode is decided by the resident's first successful capture and is
-// permanent for the rest of their enrollment — a resident can never mix
-// SEQUENTIAL (10 individual fingers) and SLAP (4-item slap) captures.
-// The client declares which mode a given capture belongs to
-// (CaptureRequest.CaptureMode) rather than the backend inferring it from
-// finger_type, because LEFT_THUMB/RIGHT_THUMB are valid in both modes and
-// can't be used to tell them apart.
+// Client declares capture_mode per request; can't be inferred from finger_type
+// since LEFT_THUMB/RIGHT_THUMB are valid in both SEQUENTIAL and SLAP.
 const (
 	CaptureModeSequential = "SEQUENTIAL"
 	CaptureModeSlap       = "SLAP"
 )
 
-// Session represents one data collection session per resident per operator
-type Session struct {
-	SessionID           string     `json:"session_id"`
-	OperatorID          string     `json:"operator_id"`
-	DeviceID            string     `json:"device_id"`
-	CentreID            string     `json:"centre_id"`
-	ResidentPseudonymID string     `json:"resident_pseudonym_id"`
-	Status              string     `json:"status"`
-	StartedAt           time.Time  `json:"started_at"`
-	ClosedAt            *time.Time `json:"closed_at"`
-	CloseReason         string     `json:"close_reason"`
-}
-
-// Consent represents resident consent record for a session — append only
+// Consent — no session concept, tied to resident + operator directly
 type Consent struct {
 	ConsentID           string    `json:"consent_id"`
-	SessionID           string    `json:"session_id"`
 	ResidentPseudonymID string    `json:"resident_pseudonym_id"`
 	Consented           bool      `json:"consented"`
 	LanguageShown       string    `json:"language_shown"`
@@ -70,11 +39,9 @@ type Consent struct {
 	CreatedAt           time.Time `json:"created_at"`
 }
 
-// Capture represents one fingerprint capture record
-// Image is stored in CEPH, only the reference key is stored here
+// Capture — image lives in CEPH, only the key is stored here
 type Capture struct {
 	CaptureID           string     `json:"capture_id"`
-	SessionID           string     `json:"session_id"`
 	ResidentPseudonymID string     `json:"resident_pseudonym_id"`
 	OperatorID          string     `json:"operator_id"`
 	FingerType          string     `json:"finger_type"`
@@ -97,21 +64,18 @@ type Capture struct {
 	UploadedAt          *time.Time `json:"uploaded_at"`
 }
 
-// AuditLog represents an immutable audit event — no updates or deletes ever
 type AuditLog struct {
 	LogID       string    `json:"log_id"`
 	EventType   string    `json:"event_type"`
 	OperatorID  string    `json:"operator_id"`
-	SessionID   string    `json:"session_id"`
 	DeviceID    string    `json:"device_id"`
 	PayloadHash string    `json:"payload_hash"`
 	IPAddress   string    `json:"ip_address"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
-// ── Request / Response structs ──────────────────────────────────────────────
+// ── Request / Response structs ──────────────────────────────────
 
-// ResidentLookupRequest is sent by Android when operator enters Aadhaar
 type ResidentLookupRequest struct {
 	AadhaarHash string `json:"aadhaar_hash" binding:"required"`
 	AgeGroup    string `json:"age_group"`
@@ -119,31 +83,19 @@ type ResidentLookupRequest struct {
 	SkinTone    string `json:"skin_tone"`
 }
 
-// ResidentLookupResponse returns resident info and session progress
 type ResidentLookupResponse struct {
 	ResidentPseudonymID string   `json:"resident_pseudonym_id"`
 	CaptureMode         string   `json:"capture_mode"`
-	CapturedFingers     []string `json:"captured_fingers"` // fingers already done
-	PendingUploads      []string `json:"pending_uploads"`  // captures pending upload
+	CapturedFingers     []string `json:"captured_fingers"`
+	PendingUploads      []string `json:"pending_uploads"`
 	TotalCaptured       int      `json:"total_captured"`
-	IsComplete          bool     `json:"is_complete"` // true once capture_mode's required count is reached
+	IsComplete          bool     `json:"is_complete"`
 }
 
-// CreateSessionRequest is sent when starting a new capture session
-type CreateSessionRequest struct {
-	OperatorID          string `json:"operator_id" binding:"required"`
-	DeviceID            string `json:"device_id" binding:"required"`
-	CentreID            string `json:"centre_id" binding:"required"`
-	ResidentPseudonymID string `json:"resident_pseudonym_id" binding:"required"`
-}
-
-// CaptureRequest is sent after each successful finger capture
-// Image is received as multipart file
 type CaptureRequest struct {
-	SessionID           string  `json:"session_id" binding:"required"`
 	ResidentPseudonymID string  `json:"resident_pseudonym_id" binding:"required"`
 	OperatorID          string  `json:"operator_id" binding:"required"`
-	CaptureMode         string  `json:"capture_mode" binding:"required"` // SEQUENTIAL | SLAP — declared by client, not inferred
+	CaptureMode         string  `json:"capture_mode" binding:"required"` // SEQUENTIAL | SLAP
 	FingerType          string  `json:"finger_type" binding:"required"`
 	Hand                string  `json:"hand" binding:"required"`
 	Nfiq2Score          float64 `json:"nfiq2_score"`
@@ -162,24 +114,16 @@ type CaptureRequest struct {
 	Thumbprint          string  `json:"thumbprint" binding:"required"`
 }
 
-// BatchCaptureRequest wraps multiple captures in one request
 type BatchCaptureRequest struct {
 	Captures []CaptureRequest `json:"captures" binding:"required"`
 }
 
-// CaptureResponse is returned after a successful capture upload
 type CaptureResponse struct {
 	CaptureID     string `json:"capture_id"`
 	FingerType    string `json:"finger_type"`
 	UploadStatus  string `json:"upload_status"`
 	TotalCaptured int    `json:"total_captured"`
 	IsComplete    bool   `json:"is_complete"`
-}
-
-// CloseSessionRequest is sent when session ends
-type CloseSessionRequest struct {
-	SessionID   string `json:"session_id" binding:"required"`
-	CloseReason string `json:"close_reason"`
 }
 
 // DevResetRequest wipes all data for a resident — dev/test only

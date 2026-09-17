@@ -19,51 +19,40 @@ func NewCaptureRepository(db *sql.DB) *CaptureRepository {
 	return &CaptureRepository{db: db}
 }
 
-// ExistsUploaded reports whether a capture with UPLOADED status already exists
-// for the given (session_id, resident_pseudonym_id, finger_type) combination.
-func (r *CaptureRepository) ExistsUploaded(sessionID, residentPseudonymID, fingerType string) (bool, error) {
+func (r *CaptureRepository) ExistsUploaded(residentPseudonymID, fingerType string) (bool, error) {
 	var exists bool
 	err := r.db.QueryRow(`
 		SELECT EXISTS(
 			SELECT 1 FROM captures
-			WHERE session_id = $1
-			  AND resident_pseudonym_id = $2
-			  AND finger_type = $3
+			WHERE resident_pseudonym_id = $1
+			  AND finger_type = $2
 			  AND upload_status = 'UPLOADED'
 		)
-	`, sessionID, residentPseudonymID, fingerType).Scan(&exists)
+	`, residentPseudonymID, fingerType).Scan(&exists)
 	return exists, err
 }
 
-// ExistsUploadedTx is ExistsUploaded run inside an existing transaction, so
-// the duplicate check is consistent with the capture-mode lock/set taken in
-// the same transaction (see ResidentRepository.LockCaptureModeTx).
-func (r *CaptureRepository) ExistsUploadedTx(tx *sql.Tx, sessionID, residentPseudonymID, fingerType string) (bool, error) {
+func (r *CaptureRepository) ExistsUploadedTx(tx *sql.Tx, residentPseudonymID, fingerType string) (bool, error) {
 	var exists bool
 	err := tx.QueryRow(`
 		SELECT EXISTS(
 			SELECT 1 FROM captures
-			WHERE session_id = $1
-			  AND resident_pseudonym_id = $2
-			  AND finger_type = $3
+			WHERE resident_pseudonym_id = $1
+			  AND finger_type = $2
 			  AND upload_status = 'UPLOADED'
 		)
-	`, sessionID, residentPseudonymID, fingerType).Scan(&exists)
+	`, residentPseudonymID, fingerType).Scan(&exists)
 	return exists, err
 }
 
-// Insert saves a single capture record and returns it with generated capture_id.
-// Returns *ErrForeignKeyViolation if any referenced FK does not exist.
 func (r *CaptureRepository) Insert(req model.CaptureRequest, cephKey string) (*model.Capture, error) {
 	return r.insert(r.db, req, cephKey)
 }
 
-// InsertTx is Insert run inside an existing transaction.
 func (r *CaptureRepository) InsertTx(tx *sql.Tx, req model.CaptureRequest, cephKey string) (*model.Capture, error) {
 	return r.insert(tx, req, cephKey)
 }
 
-// queryRower is satisfied by both *sql.DB and *sql.Tx.
 type queryRower interface {
 	QueryRow(query string, args ...interface{}) *sql.Row
 }
@@ -73,17 +62,17 @@ func (r *CaptureRepository) insert(q queryRower, req model.CaptureRequest, cephK
 
 	query := `
 		INSERT INTO captures (
-			session_id, resident_pseudonym_id, operator_id,
+			resident_pseudonym_id, operator_id,
 			finger_type, hand, nfiq2_score, blur_score,
 			brightness_score, glare_score, attempt_count,
 			degraded_flag, ceph_object_key, image_checksum,
 			camera_model, camera_resolution, device_model,
 			upload_status
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-			$11, $12, $13, $14, $15, $16, 'UPLOADED'
+			$1, $2, $3, $4, $5, $6, $7, $8, $9,
+			$10, $11, $12, $13, $14, $15, 'UPLOADED'
 		)
-		RETURNING capture_id, session_id, resident_pseudonym_id,
+		RETURNING capture_id, resident_pseudonym_id,
 		          operator_id, finger_type, hand, nfiq2_score,
 		          blur_score, brightness_score, glare_score,
 		          attempt_count, degraded_flag, ceph_object_key,
@@ -92,7 +81,6 @@ func (r *CaptureRepository) insert(q queryRower, req model.CaptureRequest, cephK
 	`
 
 	err := q.QueryRow(query,
-		req.SessionID,
 		req.ResidentPseudonymID,
 		req.OperatorID,
 		req.FingerType,
@@ -110,7 +98,6 @@ func (r *CaptureRepository) insert(q queryRower, req model.CaptureRequest, cephK
 		req.DeviceModel,
 	).Scan(
 		&capture.CaptureID,
-		&capture.SessionID,
 		&capture.ResidentPseudonymID,
 		&capture.OperatorID,
 		&capture.FingerType,
@@ -144,10 +131,9 @@ func (r *CaptureRepository) insert(q queryRower, req model.CaptureRequest, cephK
 	return capture, nil
 }
 
-// GetByResidentID returns all captures for a resident
 func (r *CaptureRepository) GetByResidentID(residentID string) ([]model.Capture, error) {
 	rows, err := r.db.Query(`
-		SELECT capture_id, session_id, resident_pseudonym_id,
+		SELECT capture_id, resident_pseudonym_id,
 		       operator_id, finger_type, hand, nfiq2_score,
 		       blur_score, brightness_score, glare_score,
 		       attempt_count, degraded_flag, upload_status, created_at
@@ -165,7 +151,6 @@ func (r *CaptureRepository) GetByResidentID(residentID string) ([]model.Capture,
 		c := model.Capture{}
 		err := rows.Scan(
 			&c.CaptureID,
-			&c.SessionID,
 			&c.ResidentPseudonymID,
 			&c.OperatorID,
 			&c.FingerType,
@@ -188,7 +173,6 @@ func (r *CaptureRepository) GetByResidentID(residentID string) ([]model.Capture,
 	return captures, nil
 }
 
-// GetPendingByResidentID returns captures with PENDING upload status
 func (r *CaptureRepository) GetPendingByResidentID(residentID string) ([]model.Capture, error) {
 	rows, err := r.db.Query(`
 		SELECT capture_id, finger_type, hand, upload_status

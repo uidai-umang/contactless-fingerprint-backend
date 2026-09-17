@@ -95,7 +95,6 @@ func (h *CaptureHandler) Upload(ctx *gin.Context) {
 	degradedFlag, _ := strconv.ParseBool(ctx.Request.FormValue("degraded_flag"))
 
 	req := model.CaptureRequest{
-		SessionID:           ctx.Request.FormValue("session_id"),
 		ResidentPseudonymID: ctx.Request.FormValue("resident_pseudonym_id"),
 		OperatorID:          ctx.Request.FormValue("operator_id"),
 		CaptureMode:         ctx.Request.FormValue("capture_mode"),
@@ -200,7 +199,6 @@ func (h *CaptureHandler) BatchUpload(ctx *gin.Context) {
 		degradedFlag, _ := strconv.ParseBool(getFormValue(form.Value, "degraded_flag_"+idx))
 
 		req := model.CaptureRequest{
-			SessionID:           getFormValue(form.Value, "session_id_"+idx),
 			ResidentPseudonymID: getFormValue(form.Value, "resident_pseudonym_id_"+idx),
 			OperatorID:          getFormValue(form.Value, "operator_id_"+idx),
 			CaptureMode:         getFormValue(form.Value, "capture_mode_"+idx),
@@ -259,9 +257,6 @@ func (h *CaptureHandler) BatchUpload(ctx *gin.Context) {
 // validateCaptureRequest checks required fields, enum values, and score ranges.
 // Returns (statusCode, errorMessage, extraData). If message is empty, the request is valid.
 func validateCaptureRequest(req model.CaptureRequest) (int, string, interface{}) {
-	if req.SessionID == "" {
-		return http.StatusBadRequest, "session_id is required", nil
-	}
 	if req.ResidentPseudonymID == "" {
 		return http.StatusBadRequest, "resident_pseudonym_id is required", nil
 	}
@@ -339,8 +334,6 @@ func validateCaptureRequest(req model.CaptureRequest) (int, string, interface{})
 // captureValidationField returns a short field name hint for batch error reporting.
 func captureValidationField(statusCode int, req model.CaptureRequest) string {
 	switch {
-	case req.SessionID == "":
-		return "session_id"
 	case req.ResidentPseudonymID == "":
 		return "resident_pseudonym_id"
 	case req.OperatorID == "":
