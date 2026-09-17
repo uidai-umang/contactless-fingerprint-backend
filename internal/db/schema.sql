@@ -1,20 +1,9 @@
 -- ENABLE UUID GENERATION
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Stores ASK (AADHAAR SEVA KENDRA) centres information
-CREATE TABLE IF NOT EXISTS centres (
-    centre_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    city VARCHAR(255) NOT NULL,
-    state VARCHAR(255) NOT NULL,
-    region VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Stores operator accounts linked to a centre
+-- Stores operator accounts
 CREATE TABLE IF NOT EXISTS operators (
     operator_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    centre_id UUID REFERENCES centres(centre_id),
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     phone_number VARCHAR(15) UNIQUE NOT NULL,
@@ -84,23 +73,9 @@ CREATE TABLE IF NOT EXISTS residents (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Represents one data collection session per resident per operator
-CREATE TABLE IF NOT EXISTS sessions (
-    session_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    operator_id UUID REFERENCES operators(operator_id),
-    device_id UUID REFERENCES devices(device_id),
-    centre_id UUID REFERENCES centres(centre_id),
-    resident_pseudonym_id UUID REFERENCES residents(resident_pseudonym_id),
-    status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'COMPLETED', 'ABANDONED', 'TIMED_OUT')),
-    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    closed_at TIMESTAMP,
-    close_reason VARCHAR(255)
-);
-
--- Stores resident consent per session — append only, never modified
+-- Resident consent — no session concept, tied to resident + operator directly
 CREATE TABLE IF NOT EXISTS consents (
     consent_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    session_id UUID NOT NULL REFERENCES sessions(session_id),
     resident_pseudonym_id UUID NOT NULL REFERENCES residents(resident_pseudonym_id),
     consented BOOLEAN NOT NULL,
     language_shown VARCHAR(50),
@@ -108,14 +83,12 @@ CREATE TABLE IF NOT EXISTS consents (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Stores one fingerprint capture record per finger per session
--- Image itself is stored in CEPH, only the reference key is stored here
+-- One capture record per finger per resident. Image lives in CEPH, only the key is stored here.
 CREATE TABLE IF NOT EXISTS captures (
     capture_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    session_id UUID NOT NULL REFERENCES sessions(session_id),
     resident_pseudonym_id UUID NOT NULL REFERENCES residents(resident_pseudonym_id),
     operator_id UUID NOT NULL REFERENCES operators(operator_id),
-        finger_type VARCHAR(20) CHECK (finger_type IN (
+    finger_type VARCHAR(20) CHECK (finger_type IN (
         'LEFT_THUMB', 'LEFT_INDEX', 'LEFT_MIDDLE', 'LEFT_RING', 'LEFT_LITTLE',
         'RIGHT_THUMB', 'RIGHT_INDEX', 'RIGHT_MIDDLE', 'RIGHT_RING', 'RIGHT_LITTLE',
         'LEFT_SLAP', 'RIGHT_SLAP'
@@ -163,7 +136,6 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     log_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     event_type VARCHAR(50) NOT NULL,
     operator_id UUID,
-    session_id UUID,
     device_id UUID,
     payload_hash VARCHAR(64),
     ip_address VARCHAR(45),
@@ -171,10 +143,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 -- Indexes for frequently queried foreign keys
-CREATE INDEX IF NOT EXISTS idx_captures_session ON captures(session_id);
 CREATE INDEX IF NOT EXISTS idx_captures_resident ON captures(resident_pseudonym_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_operator ON sessions(operator_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_session ON audit_logs(session_id);
+CREATE INDEX IF NOT EXISTS idx_captures_operator ON captures(operator_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_operator ON audit_logs(operator_id);
 CREATE INDEX IF NOT EXISTS idx_devices_camera_spec ON devices(camera_spec_id);
 CREATE INDEX IF NOT EXISTS idx_captures_device ON captures(device_id);
@@ -191,7 +161,6 @@ CREATE TABLE IF NOT EXISTS quota_targets (
 -- Records each time an operator captures a resident against a full/near-full quota bracket
 CREATE TABLE IF NOT EXISTS quota_overrides (
     override_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    session_id UUID NOT NULL REFERENCES sessions(session_id),
     resident_pseudonym_id UUID NOT NULL REFERENCES residents(resident_pseudonym_id),
     operator_id UUID NOT NULL REFERENCES operators(operator_id),
     dimension VARCHAR(20) CHECK (dimension IN ('GENDER', 'AGE_GROUP')),
