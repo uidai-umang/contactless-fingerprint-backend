@@ -105,7 +105,7 @@ func localUploadPath(objectKey string) (string, error) {
 	if len(parts) > 0 && parts[0] == "sitaa-clf" {
 		parts = parts[1:]
 	}
-	if len(parts) < 4 {
+	if len(parts) < 2 {
 		return "", fmt.Errorf("invalid object key path")
 	}
 
