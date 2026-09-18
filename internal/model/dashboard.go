@@ -84,7 +84,6 @@ type Alternative struct {
 // LogOverrideRequest is sent when an operator proceeds with a capture
 // despite the resident's demographic bracket being full/near-full
 type LogOverrideRequest struct {
-	SessionID           string `json:"session_id" binding:"required"`
 	ResidentPseudonymID string `json:"resident_pseudonym_id" binding:"required"`
 	OperatorID          string `json:"operator_id" binding:"required"`
 	Dimension           string `json:"dimension" binding:"required"`
@@ -94,7 +93,6 @@ type LogOverrideRequest struct {
 // QuotaOverride represents a logged quota override record
 type QuotaOverride struct {
 	OverrideID          string    `json:"override_id"`
-	SessionID           string    `json:"session_id"`
 	ResidentPseudonymID string    `json:"resident_pseudonym_id"`
 	OperatorID          string    `json:"operator_id"`
 	Dimension           string    `json:"dimension"`

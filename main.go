@@ -78,7 +78,6 @@ func main() {
 	// ── Dependency injection ──────────────────────────────────────────────
 	// Repositories — talk to DB
 	residentRepo := repository.NewResidentRepository(db.DB)
-	sessionRepo := repository.NewSessionRepository(db.DB)
 	captureRepo := repository.NewCaptureRepository(db.DB)
 	cameraSpecRepo := repository.NewCameraSpecRepository(db.DB)
 	deviceRepo := repository.NewDeviceRepository(db.DB)
@@ -87,15 +86,13 @@ func main() {
 
 	// Services — business logic
 	residentService := service.NewResidentService(residentRepo, captureRepo)
-	sessionService := service.NewSessionService(sessionRepo)
-	captureService := service.NewCaptureService(db.DB, captureRepo, sessionRepo, residentRepo, imageStore, decrypter)
+	captureService := service.NewCaptureService(db.DB, captureRepo, residentRepo, imageStore, decrypter)
 	deviceService := service.NewDeviceService(deviceRepo, cameraSpecRepo)
 	dashboardService := service.NewDashboardService(dashboardRepo)
 	quotaService := service.NewQuotaService(quotaRepo)
 
 	// Handlers — HTTP layer
 	residentHandler := handler.NewResidentHandler(residentService)
-	sessionHandler := handler.NewSessionHandler(sessionService)
 	captureHandler := handler.NewCaptureHandler(captureService)
 	deviceHandler := handler.NewDeviceHandler(deviceService)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService, quotaService)
@@ -114,10 +111,6 @@ func main() {
 
 		// Resident routes
 		api.POST("/residents/lookup", residentHandler.LookupOrCreate)
-
-		// Session routes
-		api.POST("/sessions", sessionHandler.Create)
-		api.POST("/sessions/close", sessionHandler.Close)
 
 		// Capture routes
 		api.POST("/captures", captureHandler.Upload)

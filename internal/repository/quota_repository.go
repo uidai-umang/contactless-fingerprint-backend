@@ -16,7 +16,6 @@ func NewQuotaRepository(db *sql.DB) *QuotaRepository {
 	return &QuotaRepository{db: db}
 }
 
-// GetTargets returns all configured national quota targets
 func (r *QuotaRepository) GetTargets() ([]model.QuotaTarget, error) {
 	rows, err := r.db.Query(`SELECT dimension, key, target_count FROM quota_targets`)
 	if err != nil {
@@ -36,7 +35,6 @@ func (r *QuotaRepository) GetTargets() ([]model.QuotaTarget, error) {
 	return targets, nil
 }
 
-// GetTarget fetches a single quota target by dimension+key. Returns nil, nil if not found.
 func (r *QuotaRepository) GetTarget(dimension, key string) (*model.QuotaTarget, error) {
 	t := &model.QuotaTarget{}
 
@@ -55,8 +53,6 @@ func (r *QuotaRepository) GetTarget(dimension, key string) (*model.QuotaTarget, 
 	return t, nil
 }
 
-// GetNationalCapturedByGender returns the count of distinct residents with a
-// confirmed capture, grouped by gender
 func (r *QuotaRepository) GetNationalCapturedByGender() (map[string]int, error) {
 	rows, err := r.db.Query(`
 		SELECT r.gender, COUNT(DISTINCT c.resident_pseudonym_id)
@@ -83,8 +79,6 @@ func (r *QuotaRepository) GetNationalCapturedByGender() (map[string]int, error) 
 	return counts, nil
 }
 
-// GetNationalCapturedByAgeGroup returns the count of distinct residents with a
-// confirmed capture, grouped by age_group
 func (r *QuotaRepository) GetNationalCapturedByAgeGroup() (map[string]int, error) {
 	rows, err := r.db.Query(`
 		SELECT r.age_group, COUNT(DISTINCT c.resident_pseudonym_id)
@@ -111,8 +105,6 @@ func (r *QuotaRepository) GetNationalCapturedByAgeGroup() (map[string]int, error
 	return counts, nil
 }
 
-// CountOverrides returns the total number of quota overrides logged for a
-// dimension+key, and how many of those were logged by the given operator
 func (r *QuotaRepository) CountOverrides(dimension, key, operatorID string) (total int, byOperator int, err error) {
 	err = r.db.QueryRow(`
 		SELECT COUNT(*), COUNT(*) FILTER (WHERE operator_id = $3)
@@ -122,26 +114,22 @@ func (r *QuotaRepository) CountOverrides(dimension, key, operatorID string) (tot
 	return total, byOperator, err
 }
 
-// InsertOverride records a quota override and returns it with generated override_id.
-// Returns *ErrForeignKeyViolation if any referenced FK does not exist.
 func (r *QuotaRepository) InsertOverride(req model.LogOverrideRequest) (*model.QuotaOverride, error) {
 	override := &model.QuotaOverride{}
 
 	query := `
-		INSERT INTO quota_overrides (session_id, resident_pseudonym_id, operator_id, dimension, key)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING override_id, session_id, resident_pseudonym_id, operator_id, dimension, key, created_at
+		INSERT INTO quota_overrides (resident_pseudonym_id, operator_id, dimension, key)
+		VALUES ($1, $2, $3, $4)
+		RETURNING override_id, resident_pseudonym_id, operator_id, dimension, key, created_at
 	`
 
 	err := r.db.QueryRow(query,
-		req.SessionID,
 		req.ResidentPseudonymID,
 		req.OperatorID,
 		req.Dimension,
 		req.Key,
 	).Scan(
 		&override.OverrideID,
-		&override.SessionID,
 		&override.ResidentPseudonymID,
 		&override.OperatorID,
 		&override.Dimension,
