@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/lib/pq" // registers postgres driver with database/sql
+	_ "github.com/go-sql-driver/mysql" // registers mysql driver with database/sql
 )
 
 // DB is global connection pool shared across all packages. It is initialized in Connect() and should be used for all database operations.
