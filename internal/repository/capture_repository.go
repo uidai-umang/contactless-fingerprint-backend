@@ -6,7 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lib/pq"
+	"github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 
 	"contactless-fingerprint-backend/internal/model"
 )
@@ -24,8 +25,8 @@ func (r *CaptureRepository) ExistsUploaded(residentPseudonymID, fingerType strin
 	err := r.db.QueryRow(`
 		SELECT EXISTS(
 			SELECT 1 FROM captures
-			WHERE resident_pseudonym_id = $1
-			  AND finger_type = $2
+			WHERE resident_pseudonym_id = ?
+			  AND finger_type = ?
 			  AND upload_status = 'UPLOADED'
 		)
 	`, residentPseudonymID, fingerType).Scan(&exists)
@@ -37,8 +38,8 @@ func (r *CaptureRepository) ExistsUploadedTx(tx *sql.Tx, residentPseudonymID, fi
 	err := tx.QueryRow(`
 		SELECT EXISTS(
 			SELECT 1 FROM captures
-			WHERE resident_pseudonym_id = $1
-			  AND finger_type = $2
+			WHERE resident_pseudonym_id = ?
+			  AND finger_type = ?
 			  AND upload_status = 'UPLOADED'
 		)
 	`, residentPseudonymID, fingerType).Scan(&exists)
@@ -53,12 +54,31 @@ func (r *CaptureRepository) InsertTx(tx *sql.Tx, req model.CaptureRequest, cephK
 	return r.insert(tx, req, cephKey)
 }
 
-type queryRower interface {
-	QueryRow(query string, args ...interface{}) *sql.Row
+type execer interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
-func (r *CaptureRepository) insert(q queryRower, req model.CaptureRequest, cephKey string) (*model.Capture, error) {
-	capture := &model.Capture{}
+func (r *CaptureRepository) insert(q execer, req model.CaptureRequest, cephKey string) (*model.Capture, error) {
+	capture := &model.Capture{
+		CaptureID:           uuid.New().String(),
+		ResidentPseudonymID: req.ResidentPseudonymID,
+		OperatorID:          req.OperatorID,
+		FingerType:          req.FingerType,
+		Hand:                req.Hand,
+		Nfiq2Score:          req.Nfiq2Score,
+		BlurScore:           req.BlurScore,
+		BrightnessScore:     req.BrightnessScore,
+		GlareScore:          req.GlareScore,
+		AttemptCount:        req.AttemptCount,
+		DegradedFlag:        req.DegradedFlag,
+		CephObjectKey:       cephKey,
+		ImageChecksum:       req.ImageChecksum,
+		CameraModel:         req.CameraModel,
+		CameraResolution:    req.CameraResolution,
+		DeviceModel:         req.DeviceModel,
+		UploadStatus:        "UPLOADED",
+		CreatedAt:           time.Now().UTC(),
+	}
 
 	query := `
 		INSERT INTO captures (
@@ -69,18 +89,12 @@ func (r *CaptureRepository) insert(q queryRower, req model.CaptureRequest, cephK
 			camera_model, camera_resolution, device_model,
 			upload_status
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9,
-			$10, $11, $12, $13, $14, $15, 'UPLOADED'
+			?, ?, ?, ?, ?, ?, ?, ?, ?,
+			?, ?, ?, ?, ?, ?, ?, ?, ?
 		)
-		RETURNING capture_id, resident_pseudonym_id,
-		          operator_id, finger_type, hand, nfiq2_score,
-		          blur_score, brightness_score, glare_score,
-		          attempt_count, degraded_flag, ceph_object_key,
-		          image_checksum, camera_model, camera_resolution,
-		          device_model, upload_status, created_at
 	`
 
-	err := q.QueryRow(query,
+	_, err := q.Exec(query,
 		req.ResidentPseudonymID,
 		req.OperatorID,
 		req.FingerType,
@@ -96,32 +110,14 @@ func (r *CaptureRepository) insert(q queryRower, req model.CaptureRequest, cephK
 		req.CameraModel,
 		req.CameraResolution,
 		req.DeviceModel,
-	).Scan(
-		&capture.CaptureID,
-		&capture.ResidentPseudonymID,
-		&capture.OperatorID,
-		&capture.FingerType,
-		&capture.Hand,
-		&capture.Nfiq2Score,
-		&capture.BlurScore,
-		&capture.BrightnessScore,
-		&capture.GlareScore,
-		&capture.AttemptCount,
-		&capture.DegradedFlag,
-		&capture.CephObjectKey,
-		&capture.ImageChecksum,
-		&capture.CameraModel,
-		&capture.CameraResolution,
-		&capture.DeviceModel,
-		&capture.UploadStatus,
-		&capture.CreatedAt,
 	)
+
 	if err != nil {
-		if pqErr, ok := err.(*pq.Error); ok {
-			if pqErr.Code == "23503" {
-				return nil, &ErrForeignKeyViolation{Field: parseFKField(pqErr.Constraint)}
+		if mysqlErr, ok := err.(*mysql.MySQLError); ok {
+			if mysqlErr.Number == 1452 {
+				return nil, &ErrForeignKeyViolation{Field: parseFKField(mysqlErr.Message)}
 			}
-			if pqErr.Code == "23505" && strings.Contains(pqErr.Constraint, "unique_uploaded_finger_per_resident") {
+			if mysqlErr.Number == 1062 && strings.Contains(mysqlErr.Message, "unique_uploaded_finger_per_resident") {
 				return nil, ErrDuplicateCapture
 			}
 		}
