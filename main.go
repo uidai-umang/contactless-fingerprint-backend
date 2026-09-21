@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 	"net/http"
@@ -44,22 +45,22 @@ func main() {
 	// Connect to PostgreSQL
 	db.Connect()
 
-	// if err := storage.Connect(); err != nil {
-	// 	log.Fatalf("Failed to connect to CEPH storage: %v", err)
-	// }
-	// log.Println("CEPH storage client initialized")
+	if err := storage.Connect(); err != nil {
+		log.Fatalf("Failed to connect to CEPH storage: %v", err)
+	}
+	log.Println("CEPH storage client initialized")
 
-	// if err := storage.TestConnection(context.Background()); err != nil {
-	// 	log.Printf("WARNING: CEPH connectivity test failed: %v", err)
-	// 	log.Printf("Server will continue running but image uploads will fail until CEPH is reachable")
-	// } else {
-	// 	log.Println("CEPH storage connected and verified successfully")
-	// }
+	if err := storage.TestConnection(context.Background()); err != nil {
+		log.Printf("WARNING: CEPH connectivity test failed: %v", err)
+		log.Printf("Server will continue running but image uploads will fail until CEPH is reachable")
+	} else {
+		log.Println("CEPH storage connected and verified successfully")
+	}
 
 	// gin.Default() includes Logger and Recovery middleware
 	router := gin.Default()
 
-	imageStore := storage.NewLocalStore()
+	imageStore := storage.NewCephStore()
 
 	privateKeyPEM, err := os.ReadFile(os.Getenv("RSA_PRIVATE_KEY_PATH"))
 	if err != nil {
@@ -139,10 +140,10 @@ func main() {
 		port = "8080"
 	}
 
-	localIP := getLocalIP()
-	log.Printf("Server starting on port %s...", port)
-	log.Printf("Local access:   http://localhost:%s", port)
-	log.Printf("Network access: http://%s:%s   <-- use this IP in Android's local.properties", localIP, port)
+	// localIP := getLocalIP()
+	// log.Printf("Server starting on port %s...", port)
+	// log.Printf("Local access:   http://localhost:%s", port)
+	// log.Printf("Network access: http://%s:%s   <-- use this IP in Android's local.properties", localIP, port)
 
 	router.Run(":" + port)
 }
