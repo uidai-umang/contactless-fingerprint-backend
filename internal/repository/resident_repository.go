@@ -26,7 +26,7 @@ func (r *ResidentRepository) FindOrCreateByAadhaarHash(req model.ResidentLookupR
 	query := `
 	SELECT resident_pseudonym_id, aadhaar_hash, age_group, gender, skin_tone, capture_mode, created_at
 	FROM residents
-	WHERE aadhaar_hash = $1
+	WHERE aadhaar_hash = ?
 	`
 	err := r.db.QueryRow(query, req.AadhaarHash).Scan(
 		&resident.ResidentPseudonymID,
@@ -49,7 +49,6 @@ func (r *ResidentRepository) FindOrCreateByAadhaarHash(req model.ResidentLookupR
 		INSERT INTO residents (resident_pseudonym_id, aadhaar_hash, age_group, gender, skin_tone, created_at)
 		VALUES (?, ?, ?, ?, ?, ?)
 		`
-
 		_, err = r.db.Exec(insertQuery,
 			resident.ResidentPseudonymID,
 			req.AadhaarHash,
@@ -58,7 +57,6 @@ func (r *ResidentRepository) FindOrCreateByAadhaarHash(req model.ResidentLookupR
 			req.SkinTone,
 			resident.CreatedAt,
 		)
-
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +88,7 @@ func (r *ResidentRepository) LockCaptureModeTx(tx *sql.Tx, residentPseudonymID s
 
 	err := tx.QueryRow(`
 		SELECT capture_mode FROM residents
-		WHERE resident_pseudonym_id = $1
+		WHERE resident_pseudonym_id = ?
 		FOR UPDATE
 	`, residentPseudonymID).Scan(&captureMode)
 

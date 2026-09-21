@@ -58,6 +58,9 @@ type execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
+// insert builds the capture row entirely from known values (no RETURNING --
+// MySQL doesn't support it), so the returned struct is assembled directly
+// from what we just inserted rather than read back from the DB.
 func (r *CaptureRepository) insert(q execer, req model.CaptureRequest, cephKey string) (*model.Capture, error) {
 	capture := &model.Capture{
 		CaptureID:           uuid.New().String(),
@@ -82,12 +85,12 @@ func (r *CaptureRepository) insert(q execer, req model.CaptureRequest, cephKey s
 
 	query := `
 		INSERT INTO captures (
-			resident_pseudonym_id, operator_id,
+			capture_id, resident_pseudonym_id, operator_id,
 			finger_type, hand, nfiq2_score, blur_score,
 			brightness_score, glare_score, attempt_count,
 			degraded_flag, ceph_object_key, image_checksum,
 			camera_model, camera_resolution, device_model,
-			upload_status
+			upload_status, created_at
 		) VALUES (
 			?, ?, ?, ?, ?, ?, ?, ?, ?,
 			?, ?, ?, ?, ?, ?, ?, ?, ?
@@ -95,23 +98,25 @@ func (r *CaptureRepository) insert(q execer, req model.CaptureRequest, cephKey s
 	`
 
 	_, err := q.Exec(query,
-		req.ResidentPseudonymID,
-		req.OperatorID,
-		req.FingerType,
-		req.Hand,
-		req.Nfiq2Score,
-		req.BlurScore,
-		req.BrightnessScore,
-		req.GlareScore,
-		req.AttemptCount,
-		req.DegradedFlag,
-		cephKey,
-		req.ImageChecksum,
-		req.CameraModel,
-		req.CameraResolution,
-		req.DeviceModel,
+		capture.CaptureID,
+		capture.ResidentPseudonymID,
+		capture.OperatorID,
+		capture.FingerType,
+		capture.Hand,
+		capture.Nfiq2Score,
+		capture.BlurScore,
+		capture.BrightnessScore,
+		capture.GlareScore,
+		capture.AttemptCount,
+		capture.DegradedFlag,
+		capture.CephObjectKey,
+		capture.ImageChecksum,
+		capture.CameraModel,
+		capture.CameraResolution,
+		capture.DeviceModel,
+		capture.UploadStatus,
+		capture.CreatedAt,
 	)
-
 	if err != nil {
 		if mysqlErr, ok := err.(*mysql.MySQLError); ok {
 			if mysqlErr.Number == 1452 {
@@ -134,7 +139,7 @@ func (r *CaptureRepository) GetByResidentID(residentID string) ([]model.Capture,
 		       blur_score, brightness_score, glare_score,
 		       attempt_count, degraded_flag, upload_status, created_at
 		FROM captures
-		WHERE resident_pseudonym_id = $1
+		WHERE resident_pseudonym_id = ?
 		ORDER BY created_at ASC
 	`, residentID)
 	if err != nil {
@@ -173,7 +178,7 @@ func (r *CaptureRepository) GetPendingByResidentID(residentID string) ([]model.C
 	rows, err := r.db.Query(`
 		SELECT capture_id, finger_type, hand, upload_status
 		FROM captures
-		WHERE resident_pseudonym_id = $1
+		WHERE resident_pseudonym_id = ?
 		AND upload_status = 'PENDING'
 	`, residentID)
 	if err != nil {

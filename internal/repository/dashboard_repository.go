@@ -19,7 +19,7 @@ func (r *DashboardRepository) GetOperatorTotalCaptured(operatorID string) (int, 
 	err := r.db.QueryRow(`
 		SELECT COUNT(DISTINCT resident_pseudonym_id)
 		FROM captures
-		WHERE operator_id = $1 AND upload_status = 'UPLOADED'
+		WHERE operator_id = ? AND upload_status = 'UPLOADED'
 	`, operatorID).Scan(&count)
 	return count, err
 }
@@ -31,7 +31,7 @@ func (r *DashboardRepository) GetOperatorCapturedToday(operatorID string) (int, 
 	err := r.db.QueryRow(`
 		SELECT COUNT(DISTINCT resident_pseudonym_id)
 		FROM captures
-		WHERE operator_id = $1 AND upload_status = 'UPLOADED' AND created_at::date = CURRENT_DATE
+		WHERE operator_id = ? AND upload_status = 'UPLOADED' AND DATE(created_at) = CURDATE()
 	`, operatorID).Scan(&count)
 	return count, err
 }
@@ -43,7 +43,7 @@ func (r *DashboardRepository) GetOperatorByGender(operatorID string) (map[string
 		SELECT r.gender, COUNT(DISTINCT c.resident_pseudonym_id)
 		FROM captures c
 		JOIN residents r ON r.resident_pseudonym_id = c.resident_pseudonym_id
-		WHERE c.operator_id = $1 AND c.upload_status = 'UPLOADED'
+		WHERE c.operator_id = ? AND c.upload_status = 'UPLOADED'
 		GROUP BY r.gender
 	`, operatorID)
 	if err != nil {
@@ -71,7 +71,7 @@ func (r *DashboardRepository) GetOperatorByAgeGroup(operatorID string) (map[stri
 		SELECT r.age_group, COUNT(DISTINCT c.resident_pseudonym_id)
 		FROM captures c
 		JOIN residents r ON r.resident_pseudonym_id = c.resident_pseudonym_id
-		WHERE c.operator_id = $1 AND c.upload_status = 'UPLOADED'
+		WHERE c.operator_id = ? AND c.upload_status = 'UPLOADED'
 		GROUP BY r.age_group
 	`, operatorID)
 	if err != nil {
@@ -98,7 +98,7 @@ func (r *DashboardRepository) GetOperatorTotalFingers(operatorID string) (int, e
 	err := r.db.QueryRow(`
 		SELECT COUNT(*)
 		FROM captures
-		WHERE operator_id = $1 AND upload_status = 'UPLOADED'
+		WHERE operator_id = ? AND upload_status = 'UPLOADED'
 	`, operatorID).Scan(&count)
 	return count, err
 }
@@ -109,7 +109,7 @@ func (r *DashboardRepository) GetOperatorByFingerType(operatorID string) (map[st
 	rows, err := r.db.Query(`
 		SELECT finger_type, COUNT(*)
 		FROM captures
-		WHERE operator_id = $1 AND upload_status = 'UPLOADED'
+		WHERE operator_id = ? AND upload_status = 'UPLOADED'
 		GROUP BY finger_type
 	`, operatorID)
 	if err != nil {
@@ -138,7 +138,7 @@ func (r *DashboardRepository) GetOperatorResidentsByFingerCount(operatorID strin
 		FROM (
 			SELECT resident_pseudonym_id, COUNT(DISTINCT finger_type) AS finger_count
 			FROM captures
-			WHERE operator_id = $1 AND upload_status = 'UPLOADED'
+			WHERE operator_id = ? AND upload_status = 'UPLOADED'
 			GROUP BY resident_pseudonym_id
 		) sub
 		GROUP BY finger_count
