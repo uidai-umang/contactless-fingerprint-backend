@@ -17,13 +17,13 @@ func (e *ErrForeignKeyViolation) Error() string {
 	return "referenced " + e.Field + " does not exist"
 }
 
-func parseFKField(constraint string) string {
+func parseFKField(message string) string {
 	switch {
-	case strings.Contains(constraint, "operator_id"):
+	case strings.Contains(message, "operator_id"):
 		return "operator_id"
-	case strings.Contains(constraint, "device_id"):
+	case strings.Contains(message, "device_id"):
 		return "device_id"
-	case strings.Contains(constraint, "resident_pseudonym_id"):
+	case strings.Contains(message, "resident_pseudonym_id"):
 		return "resident_pseudonym_id"
 	default:
 		return "related record"
