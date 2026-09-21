@@ -13,7 +13,7 @@ import (
 // DB is global connection pool shared across all packages. It is initialized in Connect() and should be used for all database operations.
 var DB *sql.DB
 
-// Connect opens and verifies a connection to the PostgreSQL database using values from .env.
+// Connect opens and verifies a connection to MySQL using values from .env.
 // Called once at startup. Kills the server if connection fails.
 func Connect() {
 	dbHost := os.Getenv("DB_HOST")
@@ -22,14 +22,23 @@ func Connect() {
 	dbUser := os.Getenv("DB_USER")
 	dbPassword := os.Getenv("DB_PASSWORD")
 
-	dsn := fmt.Sprintf("host=%s port=%s dbname=%s user=%s password=%s  sslmode=disable",
-		dbHost, dbPort, dbName, dbUser, dbPassword,
+	// Defaults to no TLS for local dev; sandbox/prod set DB_SSLMODE=require
+	tlsParam := ""
+	if os.Getenv("DB_SSLMODE") == "require" {
+		tlsParam = "&tls=true"
+	}
+
+	// parseTime=true is required -- without it the driver scans DATETIME/TIMESTAMP
+	// columns as []byte instead of time.Time, and every CreatedAt/RegisteredAt
+	// scan in the repository layer would break.
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true%s",
+		dbUser, dbPassword, dbHost, dbPort, dbName, tlsParam,
 	)
 
 	var err error
 
 	// sql.Open only validates the DSN, does not connect yet.
-	DB, err = sql.Open("postgres", dsn)
+	DB, err = sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("Error opening database: %v", err)
 	}
