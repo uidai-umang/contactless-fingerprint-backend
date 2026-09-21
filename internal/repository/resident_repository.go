@@ -2,6 +2,9 @@ package repository
 
 import (
 	"database/sql"
+	"time"
+
+	"github.com/google/uuid"
 
 	"contactless-fingerprint-backend/internal/model"
 )
@@ -36,32 +39,35 @@ func (r *ResidentRepository) FindOrCreateByAadhaarHash(req model.ResidentLookupR
 	)
 
 	if err == sql.ErrNoRows {
-		// If no existing resident found, create a new one
+		// If no existing resident found, create a new one. ID and timestamp
+		// are generated here in Go -- MySQL has no RETURNING clause, so we
+		// can't read a DB-generated ID back the way Postgres let us.
+		resident.ResidentPseudonymID = uuid.New().String()
+		resident.CreatedAt = time.Now().UTC()
+
 		insertQuery := `
-		INSERT INTO residents (aadhaar_hash, age_group, gender, skin_tone)
-		VALUES ($1, $2, $3, $4)
-		RETURNING resident_pseudonym_id, aadhaar_hash, age_group, gender, skin_tone, capture_mode, created_at
+		INSERT INTO residents (resident_pseudonym_id, aadhaar_hash, age_group, gender, skin_tone, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
 		`
-		err = r.db.QueryRow(insertQuery,
+
+		_, err = r.db.Exec(insertQuery,
+			resident.ResidentPseudonymID,
 			req.AadhaarHash,
 			req.AgeGroup,
 			req.Gender,
 			req.SkinTone,
-		).Scan(
-			&resident.ResidentPseudonymID,
-			&resident.AadhaarHash,
-			&resident.AgeGroup,
-			&resident.Gender,
-			&resident.SkinTone,
-			&captureMode,
-			&resident.CreatedAt,
+			resident.CreatedAt,
 		)
 
 		if err != nil {
 			return nil, err
 		}
 
-		resident.CaptureMode = captureMode.String
+		resident.AadhaarHash = req.AadhaarHash
+		resident.AgeGroup = req.AgeGroup
+		resident.Gender = req.Gender
+		resident.SkinTone = req.SkinTone
+		resident.CaptureMode = ""
 		return resident, nil
 	}
 
@@ -105,8 +111,8 @@ func (r *ResidentRepository) LockCaptureModeTx(tx *sql.Tx, residentPseudonymID s
 // within the same transaction/lock.
 func (r *ResidentRepository) SetCaptureModeTx(tx *sql.Tx, residentID, mode string) error {
 	_, err := tx.Exec(`
-		UPDATE residents SET capture_mode = $1
-		WHERE resident_pseudonym_id = $2
+		UPDATE residents SET capture_mode = ?
+		WHERE resident_pseudonym_id = ?
 	`, mode, residentID)
 	return err
 }
@@ -114,7 +120,7 @@ func (r *ResidentRepository) SetCaptureModeTx(tx *sql.Tx, residentID, mode strin
 // DeleteByAadhaarHash wipes all data for a resident — used in dev/test only
 func (r *ResidentRepository) DeleteByAadhaarHash(aadhaarHash string) error {
 	_, err := r.db.Exec(
-		`DELETE FROM residents WHERE aadhaar_hash = $1`,
+		`DELETE FROM residents WHERE aadhaar_hash = ?`,
 		aadhaarHash,
 	)
 	return err
