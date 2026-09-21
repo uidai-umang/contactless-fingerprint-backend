@@ -2,9 +2,12 @@ package repository
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"time"
 
-	"github.com/lib/pq"
+	"github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 
 	"contactless-fingerprint-backend/internal/model"
 )
@@ -25,6 +28,8 @@ func NewCameraSpecRepository(db *sql.DB) *CameraSpecRepository {
 // error — so callers can distinguish "needs insert" from "query failed".
 func (r *CameraSpecRepository) FindByFingerprintHash(hash string) (*model.CameraSpec, error) {
 	spec := &model.CameraSpec{}
+	var afModesJSON, aeModesJSON, awbModesJSON []byte
+
 	err := r.db.QueryRow(`
 		SELECT camera_spec_id, fingerprint_hash, camera_id, lens_facing,
 		       hardware_level, sensor_physical_size_mm, sensor_active_array_size,
@@ -33,20 +38,22 @@ func (r *CameraSpecRepository) FindByFingerprintHash(hash string) (*model.Camera
 		       has_flash, has_ois, max_digital_zoom, sensor_orientation,
 		       supports_raw, af_modes, ae_modes, awb_modes, created_at
 		FROM camera_specs
-		WHERE fingerprint_hash = $1
+		WHERE fingerprint_hash = ?
 	`, hash).Scan(
 		&spec.CameraSpecID, &spec.FingerprintHash, &spec.CameraID, &spec.LensFacing,
 		&spec.HardwareLevel, &spec.SensorPhysicalSizeMM, &spec.SensorActiveArraySize,
 		&spec.PixelArraySize, &spec.FocalLengthMM, &spec.Aperture,
 		&spec.MinFocusDistanceDiopters, &spec.HyperfocalDistanceDiopters,
 		&spec.HasFlash, &spec.HasOIS, &spec.MaxDigitalZoom, &spec.SensorOrientation,
-		&spec.SupportsRaw, pq.Array(&spec.AfModes), pq.Array(&spec.AeModes),
-		pq.Array(&spec.AwbModes), &spec.CreatedAt,
+		&spec.SupportsRaw, &afModesJSON, &aeModesJSON, &awbModesJSON, &spec.CreatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := unmarshalModes(afModesJSON, aeModesJSON, awbModesJSON, spec); err != nil {
 		return nil, err
 	}
 	return spec, nil
@@ -57,45 +64,88 @@ func (r *CameraSpecRepository) FindByFingerprintHash(hash string) (*model.Camera
 // first to avoid hitting this in the normal path; this guards the race
 // where two devices with identical hardware register concurrently.
 func (r *CameraSpecRepository) Insert(spec model.CameraSpec) (*model.CameraSpec, error) {
-	result := &model.CameraSpec{}
-	err := r.db.QueryRow(`
+	// MySQL's JSON columns need real JSON, not a Go slice — af_modes/ae_modes/
+	// awb_modes were array columns in Postgres (via pq.Array); here they're
+	// marshalled by hand on the way in and out.
+	afModesJSON, err := json.Marshal(spec.AfModes)
+	if err != nil {
+		return nil, err
+	}
+	aeModesJSON, err := json.Marshal(spec.AeModes)
+	if err != nil {
+		return nil, err
+	}
+	awbModesJSON, err := json.Marshal(spec.AwbModes)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &model.CameraSpec{
+		CameraSpecID:               uuid.New().String(),
+		FingerprintHash:            spec.FingerprintHash,
+		CameraID:                   spec.CameraID,
+		LensFacing:                 spec.LensFacing,
+		HardwareLevel:              spec.HardwareLevel,
+		SensorPhysicalSizeMM:       spec.SensorPhysicalSizeMM,
+		SensorActiveArraySize:      spec.SensorActiveArraySize,
+		PixelArraySize:             spec.PixelArraySize,
+		FocalLengthMM:              spec.FocalLengthMM,
+		Aperture:                   spec.Aperture,
+		MinFocusDistanceDiopters:   spec.MinFocusDistanceDiopters,
+		HyperfocalDistanceDiopters: spec.HyperfocalDistanceDiopters,
+		HasFlash:                   spec.HasFlash,
+		HasOIS:                     spec.HasOIS,
+		MaxDigitalZoom:             spec.MaxDigitalZoom,
+		SensorOrientation:          spec.SensorOrientation,
+		SupportsRaw:                spec.SupportsRaw,
+		AfModes:                    spec.AfModes,
+		AeModes:                    spec.AeModes,
+		AwbModes:                   spec.AwbModes,
+		CreatedAt:                  time.Now().UTC(),
+	}
+
+	_, err = r.db.Exec(`
 		INSERT INTO camera_specs (
-			fingerprint_hash, camera_id, lens_facing, hardware_level,
+			camera_spec_id, fingerprint_hash, camera_id, lens_facing, hardware_level,
 			sensor_physical_size_mm, sensor_active_array_size, pixel_array_size,
 			focal_length_mm, aperture, min_focus_distance_diopters,
 			hyperfocal_distance_diopters, has_flash, has_ois, max_digital_zoom,
-			sensor_orientation, supports_raw, af_modes, ae_modes, awb_modes
+			sensor_orientation, supports_raw, af_modes, ae_modes, awb_modes, created_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-			$11, $12, $13, $14, $15, $16, $17, $18, $19
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 		)
-		RETURNING camera_spec_id, fingerprint_hash, camera_id, lens_facing,
-		          hardware_level, sensor_physical_size_mm, sensor_active_array_size,
-		          pixel_array_size, focal_length_mm, aperture,
-		          min_focus_distance_diopters, hyperfocal_distance_diopters,
-		          has_flash, has_ois, max_digital_zoom, sensor_orientation,
-		          supports_raw, af_modes, ae_modes, awb_modes, created_at
 	`,
-		spec.FingerprintHash, spec.CameraID, spec.LensFacing, spec.HardwareLevel,
+		result.CameraSpecID, spec.FingerprintHash, spec.CameraID, spec.LensFacing, spec.HardwareLevel,
 		spec.SensorPhysicalSizeMM, spec.SensorActiveArraySize, spec.PixelArraySize,
 		spec.FocalLengthMM, spec.Aperture, spec.MinFocusDistanceDiopters,
 		spec.HyperfocalDistanceDiopters, spec.HasFlash, spec.HasOIS, spec.MaxDigitalZoom,
-		spec.SensorOrientation, spec.SupportsRaw,
-		pq.Array(spec.AfModes), pq.Array(spec.AeModes), pq.Array(spec.AwbModes),
-	).Scan(
-		&result.CameraSpecID, &result.FingerprintHash, &result.CameraID, &result.LensFacing,
-		&result.HardwareLevel, &result.SensorPhysicalSizeMM, &result.SensorActiveArraySize,
-		&result.PixelArraySize, &result.FocalLengthMM, &result.Aperture,
-		&result.MinFocusDistanceDiopters, &result.HyperfocalDistanceDiopters,
-		&result.HasFlash, &result.HasOIS, &result.MaxDigitalZoom, &result.SensorOrientation,
-		&result.SupportsRaw, pq.Array(&result.AfModes), pq.Array(&result.AeModes),
-		pq.Array(&result.AwbModes), &result.CreatedAt,
+		spec.SensorOrientation, spec.SupportsRaw, afModesJSON, aeModesJSON, awbModesJSON, result.CreatedAt,
 	)
 	if err != nil {
-		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
+		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1062 {
 			return nil, ErrDuplicateCameraSpec
 		}
 		return nil, err
 	}
 	return result, nil
+}
+
+func unmarshalModes(afJSON, aeJSON, awbJSON []byte, spec *model.CameraSpec) error {
+	if len(afJSON) > 0 {
+		if err := json.Unmarshal(afJSON, &spec.AfModes); err != nil {
+			return err
+		}
+	}
+	if len(aeJSON) > 0 {
+		if err := json.Unmarshal(aeJSON, &spec.AeModes); err != nil {
+			return err
+		}
+	}
+	if len(awbJSON) > 0 {
+		if err := json.Unmarshal(awbJSON, &spec.AwbModes); err != nil {
+			return err
+		}
+	}
+	return nil
 }

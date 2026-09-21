@@ -2,8 +2,10 @@ package repository
 
 import (
 	"database/sql"
+	"time"
 
-	"github.com/lib/pq"
+	"github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 
 	"contactless-fingerprint-backend/internal/model"
 )
@@ -17,7 +19,7 @@ func NewQuotaRepository(db *sql.DB) *QuotaRepository {
 }
 
 func (r *QuotaRepository) GetTargets() ([]model.QuotaTarget, error) {
-	rows, err := r.db.Query(`SELECT dimension, key, target_count FROM quota_targets`)
+	rows, err := r.db.Query("SELECT dimension, `key`, target_count FROM quota_targets")
 	if err != nil {
 		return nil, err
 	}
@@ -39,9 +41,9 @@ func (r *QuotaRepository) GetTarget(dimension, key string) (*model.QuotaTarget, 
 	t := &model.QuotaTarget{}
 
 	err := r.db.QueryRow(`
-		SELECT dimension, key, target_count
+		SELECT dimension, `+"`key`"+`, target_count
 		FROM quota_targets
-		WHERE dimension = $1 AND key = $2
+		WHERE dimension = ? AND `+"`key`"+` = ?
 	`, dimension, key).Scan(&t.Dimension, &t.Key, &t.TargetCount)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -106,39 +108,38 @@ func (r *QuotaRepository) GetNationalCapturedByAgeGroup() (map[string]int, error
 }
 
 func (r *QuotaRepository) CountOverrides(dimension, key, operatorID string) (total int, byOperator int, err error) {
+	// MySQL has no FILTER (WHERE ...) clause -- CASE WHEN inside COUNT is the equivalent
 	err = r.db.QueryRow(`
-		SELECT COUNT(*), COUNT(*) FILTER (WHERE operator_id = $3)
+		SELECT COUNT(*), COUNT(CASE WHEN operator_id = ? THEN 1 END)
 		FROM quota_overrides
-		WHERE dimension = $1 AND key = $2
-	`, dimension, key, operatorID).Scan(&total, &byOperator)
+		WHERE dimension = ? AND `+"`key`"+` = ?
+	`, operatorID, dimension, key).Scan(&total, &byOperator)
 	return total, byOperator, err
 }
 
 func (r *QuotaRepository) InsertOverride(req model.LogOverrideRequest) (*model.QuotaOverride, error) {
-	override := &model.QuotaOverride{}
+	override := &model.QuotaOverride{
+		OverrideID:          uuid.New().String(),
+		ResidentPseudonymID: req.ResidentPseudonymID,
+		OperatorID:          req.OperatorID,
+		Dimension:           req.Dimension,
+		Key:                 req.Key,
+		CreatedAt:           time.Now().UTC(),
+	}
 
-	query := `
-		INSERT INTO quota_overrides (resident_pseudonym_id, operator_id, dimension, key)
-		VALUES ($1, $2, $3, $4)
-		RETURNING override_id, resident_pseudonym_id, operator_id, dimension, key, created_at
-	`
+	query := "INSERT INTO quota_overrides (override_id, resident_pseudonym_id, operator_id, dimension, `key`, created_at) VALUES (?, ?, ?, ?, ?, ?)"
 
-	err := r.db.QueryRow(query,
-		req.ResidentPseudonymID,
-		req.OperatorID,
-		req.Dimension,
-		req.Key,
-	).Scan(
-		&override.OverrideID,
-		&override.ResidentPseudonymID,
-		&override.OperatorID,
-		&override.Dimension,
-		&override.Key,
-		&override.CreatedAt,
+	_, err := r.db.Exec(query,
+		override.OverrideID,
+		override.ResidentPseudonymID,
+		override.OperatorID,
+		override.Dimension,
+		override.Key,
+		override.CreatedAt,
 	)
 	if err != nil {
-		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23503" {
-			return nil, &ErrForeignKeyViolation{Field: parseFKField(pqErr.Constraint)}
+		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1452 {
+			return nil, &ErrForeignKeyViolation{Field: parseFKField(mysqlErr.Message)}
 		}
 		return nil, err
 	}
