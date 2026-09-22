@@ -36,9 +36,8 @@ func getLocalIP() string {
 
 func main() {
 	// Load .env - must run before anything else to ensure environment variables are set
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error Loading .env file")
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, reading config from environment")
 	}
 
 	// Connect to PostgreSQL
