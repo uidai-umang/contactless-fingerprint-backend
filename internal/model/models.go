@@ -129,3 +129,13 @@ type CaptureResponse struct {
 type DevResetRequest struct {
 	AadhaarHash string `json:"aadhaar_hash" binding:"required"`
 }
+
+type OperatorLookupRequest struct {
+	OperatorRefID string `json:"operator_ref_id" binding:"required"`
+}
+
+type OperatorLookupResponse struct {
+	OperatorID    string `json:"operator_id"`
+	OperatorRefID string `json:"operator_ref_id"`
+	Status        string `json:"status"`
+}
