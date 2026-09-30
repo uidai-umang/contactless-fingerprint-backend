@@ -59,7 +59,7 @@ func (r *OperatorRepository) FindOrCreateByRefID(operatorRefId string) (*model.O
 	_, err = r.db.Exec(`
 		INSERT INTO operators (operator_id, operator_ref_id, status, created_at)
 		VALUES (?,?, 'ACTIVE', ?)
-	`, op.OperatorID, op.OperatorRefID, op.Status, op.CreatedAt)
+	`, op.OperatorID, op.OperatorRefID, op.CreatedAt)
 
 	if err != nil {
 		return nil, err
