@@ -139,3 +139,31 @@ type OperatorLookupResponse struct {
 	OperatorRefID string `json:"operator_ref_id"`
 	Status        string `json:"status"`
 }
+
+type RefreshToken struct {
+	TokenID    string     `json:"-"`
+	OperatorID string     `json:"-"`
+	TokenHash  string     `json:"-"`
+	ExpiresAt  time.Time  `json:"-"`
+	RevokedAt  *time.Time `json:"-"`
+	CreatedAt  time.Time  `json:"-"`
+}
+
+type AuthTokenRequest struct {
+	OperatorRefID string `json:"operator_ref_id" binding:"required"`
+}
+
+type AuthTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int    `json:"expires_in"` // seconds until access_token expires
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}

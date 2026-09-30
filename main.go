@@ -12,6 +12,7 @@ import (
 	"contactless-fingerprint-backend/internal/crypto"
 	"contactless-fingerprint-backend/internal/db"
 	"contactless-fingerprint-backend/internal/handler"
+	"contactless-fingerprint-backend/internal/middleware"
 	"contactless-fingerprint-backend/internal/repository"
 	"contactless-fingerprint-backend/internal/service"
 	"contactless-fingerprint-backend/internal/storage"
@@ -83,6 +84,7 @@ func main() {
 	dashboardRepo := repository.NewDashboardRepository(db.DB)
 	quotaRepo := repository.NewQuotaRepository(db.DB)
 	operatorRepo := repository.NewOperatorRepository(db.DB)
+	refreshTokenRepo := repository.NewRefreshTokenRepository(db.DB)
 
 	// Services — business logic
 	residentService := service.NewResidentService(residentRepo, captureRepo)
@@ -99,6 +101,7 @@ func main() {
 	quotaHandler := handler.NewQuotaHandler(quotaService)
 	devHandler := handler.NewDevHandler(operatorRepo)
 	operatorHandler := handler.NewOperatorHandler(operatorRepo)
+	authHandler := handler.NewAuthHandler(operatorRepo, refreshTokenRepo)
 
 	// ── Routes ───────────────────────────────────────────────────────────
 	api := router.Group("/clf/v1")
@@ -110,34 +113,27 @@ func main() {
 				"service": "contactless-fingerprint-backend",
 			})
 		})
-
-		// Resident routes
-		api.POST("/residents/lookup", residentHandler.LookupOrCreate)
-
-		// Capture routes
-		api.POST("/captures", captureHandler.Upload)
-		api.POST("/captures/batch", captureHandler.BatchUpload)
-
-		// Dev/test only — reset resident data
+		api.POST("/auth/token", authHandler.IssueToken)
+		api.POST("/auth/refresh", authHandler.Refresh)
+		api.POST("/auth/logout", authHandler.Logout)
+		api.POST("/dev/operators/register", devHandler.RegisterTestOperator)
 		api.DELETE("/dev/reset", residentHandler.Reset)
 
-		// Routes — inside the api group
-		api.POST("/devices/register", deviceHandler.Register)
-
-		// Dashboard routes
-		api.GET("/dashboard/overview", dashboardHandler.Overview)
-		api.GET("/dashboard/diversity", dashboardHandler.Diversity)
-		api.GET("/dashboard/fingers", dashboardHandler.Fingers)
-		api.GET("/dashboard/alerts", dashboardHandler.Alerts)
-
-		// Quota routes
-		api.GET("/quota/check", quotaHandler.Check)
-		api.POST("/quota/override", quotaHandler.LogOverride)
-
-		// Operator
-		api.POST("/dev/operators/register", devHandler.RegisterTestOperator)
-		api.POST("/operators/lookup", operatorHandler.LookupOrCreate)
-
+		protected := api.Group("")
+		protected.Use(middleware.RequireAuth())
+		{
+			protected.POST("/residents/lookup", residentHandler.LookupOrCreate)
+			protected.POST("/operators/lookup", operatorHandler.LookupOrCreate)
+			protected.POST("/captures", captureHandler.Upload)
+			protected.POST("/captures/batch", captureHandler.BatchUpload)
+			protected.POST("/devices/register", deviceHandler.Register)
+			protected.GET("/dashboard/overview", dashboardHandler.Overview)
+			protected.GET("/dashboard/diversity", dashboardHandler.Diversity)
+			protected.GET("/dashboard/fingers", dashboardHandler.Fingers)
+			protected.GET("/dashboard/alerts", dashboardHandler.Alerts)
+			protected.GET("/quota/check", quotaHandler.Check)
+			protected.POST("/quota/override", quotaHandler.LogOverride)
+		}
 	}
 
 	port := os.Getenv("SERVER_PORT")
