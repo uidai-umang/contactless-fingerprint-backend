@@ -4,11 +4,10 @@ import "time"
 
 // Operator represents a data collection operator
 type Operator struct {
-	OperatorID  string     `json:"operator_id"`
-	FaceAuthRef string     `json:"face_auth_ref"`
-	Status      string     `json:"status"`
-	CreatedAt   time.Time  `json:"created_at"`
-	LastLoginAt *time.Time `json:"last_login_at"`
+	OperatorID    string    `json:"operator_id"`
+	OperatorRefID string    `json:"operator_ref_id"`
+	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // Resident — no PII stored
