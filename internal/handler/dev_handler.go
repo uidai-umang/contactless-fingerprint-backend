@@ -28,10 +28,8 @@ const testOperatorID = "00000000-0000-0000-0000-000000000001"
 func (h *DevHandler) RegisterTestOperator(ctx *gin.Context) {
 	created, err := h.operatorRepo.SeedTestOperator(
 		testOperatorID,
-		"Test Operator",
-		"test.operator@uidai.gov.in",
-		"9999999999",
 	)
+
 	if err != nil {
 		log.Printf("RegisterTestOperator error: %v", err)
 		respondError(ctx, http.StatusInternalServerError, "An unexpected error occurred")
