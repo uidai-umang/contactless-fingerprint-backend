@@ -26,7 +26,7 @@ const testOperatorID = "00000000-0000-0000-0000-000000000001"
 //	200 -- already existed, nothing changed
 //	500 -- unexpected DB error
 func (h *DevHandler) RegisterTestOperator(ctx *gin.Context) {
-	created, err := h.operatorRepo.SeedTestOperator(
+	created, err := h.operatorRepo.AddTestOperator(
 		testOperatorID,
 	)
 

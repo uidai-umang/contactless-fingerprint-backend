@@ -13,11 +13,11 @@ func NewOperatorRepository(db *sql.DB) *OperatorRepository {
 // SeedTestOperator inserts the reserved test operator if it doesn't already
 // exist. INSERT IGNORE makes this idempotent -- safe to call again after a
 // DB reset; does nothing (no error) if the row is already there.
-func (r *OperatorRepository) SeedTestOperator(operatorID, name, email, phone string) (created bool, err error) {
-	res, err := r.db.Exec(`
-		INSERT IGNORE INTO operators (operator_id, name, email, phone_number, status)
-		VALUES (?, ?, ?, ?, 'ACTIVE')
-	`, operatorID, name, email, phone)
+func (r *OperatorRepository) AddTestOperator(operatorID string) (created bool, err error) {
+	res, err := r.db.Exec(
+		`INSERT IGNORE INTO operators (operator_id, status) VALUES (?, 'ACTIVE')`,
+		operatorID,
+	)
 	if err != nil {
 		return false, err
 	}
