@@ -98,6 +98,7 @@ func main() {
 	dashboardHandler := handler.NewDashboardHandler(dashboardService, quotaService)
 	quotaHandler := handler.NewQuotaHandler(quotaService)
 	devHandler := handler.NewDevHandler(operatorRepo)
+	operatorHandler := handler.NewOperatorHandler(operatorRepo)
 
 	// ── Routes ───────────────────────────────────────────────────────────
 	api := router.Group("/clf/v1")
@@ -135,6 +136,7 @@ func main() {
 
 		// Operator
 		api.POST("/dev/operators/register", devHandler.RegisterTestOperator)
+		api.POST("/operators/lookup", operatorHandler.LookupOrCreate)
 
 	}
 

@@ -34,7 +34,7 @@ func (r *OperatorRepository) AddTestOperator(operatorID string) (created bool, e
 	return rows > 0, nil
 }
 
-func (r *OperatorRepository) FindOrCreateByRefId(operatorRefId string) (*model.Operator, error) {
+func (r *OperatorRepository) FindOrCreateByRefID(operatorRefId string) (*model.Operator, error) {
 	op := &model.Operator{}
 
 	err := r.db.QueryRow(`
@@ -47,7 +47,7 @@ func (r *OperatorRepository) FindOrCreateByRefId(operatorRefId string) (*model.O
 		return op, nil
 	}
 
-	if err != !sql.ErrNoRows {
+	if err != sql.ErrNoRows {
 		return nil, err
 	}
 
