@@ -82,6 +82,7 @@ func main() {
 	deviceRepo := repository.NewDeviceRepository(db.DB)
 	dashboardRepo := repository.NewDashboardRepository(db.DB)
 	quotaRepo := repository.NewQuotaRepository(db.DB)
+	operatorRepo := repository.NewOperatorRepository(db.DB)
 
 	// Services — business logic
 	residentService := service.NewResidentService(residentRepo, captureRepo)
@@ -96,6 +97,8 @@ func main() {
 	deviceHandler := handler.NewDeviceHandler(deviceService)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService, quotaService)
 	quotaHandler := handler.NewQuotaHandler(quotaService)
+	devHandler := handler.NewDevHandler(operatorRepo)
+	operatorHandler := handler.NewOperatorHandler(operatorRepo)
 
 	// ── Routes ───────────────────────────────────────────────────────────
 	api := router.Group("/clf/v1")
@@ -131,11 +134,15 @@ func main() {
 		api.GET("/quota/check", quotaHandler.Check)
 		api.POST("/quota/override", quotaHandler.LogOverride)
 
+		// Operator
+		api.POST("/dev/operators/register", devHandler.RegisterTestOperator)
+		api.POST("/operators/lookup", operatorHandler.LookupOrCreate)
+
 	}
 
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
-		port = "8080"
+		port = "8000"
 	}
 
 	localIP := getLocalIP()
