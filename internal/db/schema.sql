@@ -5,12 +5,9 @@
 -- Stores operator accounts
 CREATE TABLE IF NOT EXISTS operators (
     operator_id CHAR(36) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    phone_number VARCHAR(15) UNIQUE NOT NULL,
+    operator_ref_id VARCHAR(255) UNIQUE,
     status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'SUSPENDED')),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_login_at TIMESTAMP NULL
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 -- Stores camera hardware specifications, deduped by fingerprint hash.
