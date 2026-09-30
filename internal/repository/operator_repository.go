@@ -1,6 +1,12 @@
 package repository
 
-import "database/sql"
+import (
+	"contactless-fingerprint-backend/internal/model"
+	"database/sql"
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type OperatorRepository struct {
 	db *sql.DB
@@ -26,4 +32,38 @@ func (r *OperatorRepository) AddTestOperator(operatorID string) (created bool, e
 		return false, err
 	}
 	return rows > 0, nil
+}
+
+func (r *OperatorRepository) FindOrCreateByRefId(operatorRefId string) (*model.Operator, error) {
+	op := &model.Operator{}
+
+	err := r.db.QueryRow(`
+		SELECT operator_id, operator_ref_id, status, created_at
+		FROM operators
+		WHERE operator_ref_id = ?
+	`, operatorRefId).Scan(&op.OperatorID, &op.OperatorRefID, &op.Status, &op.CreatedAt)
+
+	if err == nil {
+		return op, nil
+	}
+
+	if err != !sql.ErrNoRows {
+		return nil, err
+	}
+
+	op.OperatorID = uuid.New().String()
+	op.OperatorRefID = operatorRefId
+	op.Status = "ACTIVE"
+	op.CreatedAt = time.Now().UTC()
+
+	_, err = r.db.Exec(`
+		INSERT INTO operators (operator_id, operator_ref_id, status, created_at)
+		VALUES (?,?, 'ACTIVE', ?)
+	`, op.OperatorID, op.OperatorRefID, op.Status, op.CreatedAt)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return op, nil
 }
