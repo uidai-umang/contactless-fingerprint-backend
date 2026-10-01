@@ -136,7 +136,7 @@ func main() {
 
 	// port := os.Getenv("SERVER_PORT")
 	// if port == "" {
-	// 	port = "8080"
+	// 	log.Fatal("SERVER_PORT ")
 	// }
 
 	// localIP := getLocalIP()
