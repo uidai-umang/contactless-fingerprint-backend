@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"contactless-fingerprint-backend/internal/middleware"
 	"contactless-fingerprint-backend/internal/model"
 	"contactless-fingerprint-backend/internal/repository"
 	"contactless-fingerprint-backend/internal/service"
@@ -79,6 +80,8 @@ func (h *QuotaHandler) LogOverride(ctx *gin.Context) {
 		respondError(ctx, http.StatusBadRequest, "Invalid request body: "+err.Error())
 		return
 	}
+
+	req.OperatorID = middleware.OperatorID(ctx)
 
 	req.Dimension = strings.ToUpper(strings.TrimSpace(req.Dimension))
 	if !validDimensions[req.Dimension] {
