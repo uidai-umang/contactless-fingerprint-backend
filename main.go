@@ -134,15 +134,22 @@ func main() {
 
 	}
 
-	port := os.Getenv("SERVER_PORT")
-	if port == "" {
-		port = "8080"
-	}
+	// port := os.Getenv("SERVER_PORT")
+	// if port == "" {
+	// 	port = "8080"
+	// }
 
 	// localIP := getLocalIP()
 	// log.Printf("Server starting on port %s...", port)
 	// log.Printf("Local access:   http://localhost:%s", port)
 	// log.Printf("Network access: http://%s:%s   <-- use this IP in Android's local.properties", localIP, port)
 
-	router.Run(":" + port)
+	// router.Run(":" + port)
+
+	addr := os.Getenv("BIND_ADDRESS")
+	if addr == "" {
+		log.Fatal("BIND_ADDRESS environment variable is required but not set")
+	}
+
+	router.Run(addr)
 }
