@@ -46,4 +46,9 @@ func RequireAuth() gin.HandlerFunc {
 		// response and returning early, so it never reaches Next().
 		ctx.Next()
 	}
+
+}
+
+func OperatorID(ctx *gin.Context) string {
+	return ctx.MustGet("operator_id").(string)
 }
