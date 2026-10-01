@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"contactless-fingerprint-backend/internal/middleware"
 	"contactless-fingerprint-backend/internal/model"
 	"contactless-fingerprint-backend/internal/repository"
 	"contactless-fingerprint-backend/internal/service"
@@ -35,14 +36,13 @@ func (h *DeviceHandler) Register(ctx *gin.Context) {
 		return
 	}
 
+	req.OperatorID = middleware.OperatorID(ctx)
+
 	if req.AndroidID == "" {
 		respondError(ctx, http.StatusBadRequest, "android_id is required")
 		return
 	}
-	if req.OperatorID == "" {
-		respondError(ctx, http.StatusBadRequest, "operator_id is required")
-		return
-	}
+
 	if req.CameraFingerprintHash == "" {
 		respondError(ctx, http.StatusBadRequest, "camera_fingerprint_hash is required")
 		return

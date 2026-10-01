@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"contactless-fingerprint-backend/internal/middleware"
 	"contactless-fingerprint-backend/internal/model"
 	"contactless-fingerprint-backend/internal/repository"
 	"contactless-fingerprint-backend/internal/service"
@@ -96,7 +97,7 @@ func (h *CaptureHandler) Upload(ctx *gin.Context) {
 
 	req := model.CaptureRequest{
 		ResidentPseudonymID: ctx.Request.FormValue("resident_pseudonym_id"),
-		OperatorID:          ctx.Request.FormValue("operator_id"),
+		OperatorID:          middleware.OperatorID(ctx),
 		CaptureMode:         ctx.Request.FormValue("capture_mode"),
 		FingerType:          ctx.Request.FormValue("finger_type"),
 		Hand:                ctx.Request.FormValue("hand"),
@@ -179,6 +180,8 @@ func (h *CaptureHandler) BatchUpload(ctx *gin.Context) {
 	items := make([]parsedItem, 0, count)
 	var valErrs []batchItemValidationError
 
+	operatorID := middleware.OperatorID(ctx)
+
 	for i := 0; i < count; i++ {
 		idx := strconv.Itoa(i)
 
@@ -200,7 +203,7 @@ func (h *CaptureHandler) BatchUpload(ctx *gin.Context) {
 
 		req := model.CaptureRequest{
 			ResidentPseudonymID: getFormValue(form.Value, "resident_pseudonym_id_"+idx),
-			OperatorID:          getFormValue(form.Value, "operator_id_"+idx),
+			OperatorID:          operatorID,
 			CaptureMode:         getFormValue(form.Value, "capture_mode_"+idx),
 			FingerType:          getFormValue(form.Value, "finger_type_"+idx),
 			Hand:                getFormValue(form.Value, "hand_"+idx),
