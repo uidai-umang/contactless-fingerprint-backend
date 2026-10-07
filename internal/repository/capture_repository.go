@@ -158,7 +158,7 @@ func (r *CaptureRepository) insert(q execer, req model.CaptureRequest, cephKey s
 func (r *CaptureRepository) GetByResidentID(residentID string) ([]model.Capture, error) {
 	rows, err := r.db.Query(`
 		SELECT capture_id, resident_pseudonym_id,
-		       operator_id, finger_type, hand, nfiq2_score,
+		       operator_id, finger_type, hand, capture_mode, nfiq2_score,
 		       blur_score, brightness_score, glare_score,
 		       attempt_count, degraded_flag, upload_status, created_at
 		FROM captures
@@ -179,6 +179,7 @@ func (r *CaptureRepository) GetByResidentID(residentID string) ([]model.Capture,
 			&c.OperatorID,
 			&c.FingerType,
 			&c.Hand,
+			&c.CaptureMode,
 			&c.Nfiq2Score,
 			&c.BlurScore,
 			&c.BrightnessScore,
