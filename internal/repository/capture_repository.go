@@ -89,6 +89,7 @@ func (r *CaptureRepository) insert(q execer, req model.CaptureRequest, cephKey s
 		OperatorID:          req.OperatorID,
 		FingerType:          req.FingerType,
 		Hand:                req.Hand,
+		CaptureMode:         req.CaptureMode,
 		Nfiq2Score:          req.Nfiq2Score,
 		BlurScore:           req.BlurScore,
 		BrightnessScore:     req.BrightnessScore,
@@ -107,13 +108,13 @@ func (r *CaptureRepository) insert(q execer, req model.CaptureRequest, cephKey s
 	query := `
 		INSERT INTO captures (
 			capture_id, resident_pseudonym_id, operator_id,
-			finger_type, hand, nfiq2_score, blur_score,
+			finger_type, hand, capture_mode, nfiq2_score, blur_score,
 			brightness_score, glare_score, attempt_count,
 			degraded_flag, ceph_object_key, image_checksum,
 			camera_model, camera_resolution, device_model,
 			upload_status, created_at
 		) VALUES (
-			?, ?, ?, ?, ?, ?, ?, ?, ?,
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 			?, ?, ?, ?, ?, ?, ?, ?, ?
 		)
 	`
@@ -124,6 +125,7 @@ func (r *CaptureRepository) insert(q execer, req model.CaptureRequest, cephKey s
 		capture.OperatorID,
 		capture.FingerType,
 		capture.Hand,
+		capture.CaptureMode,
 		capture.Nfiq2Score,
 		capture.BlurScore,
 		capture.BrightnessScore,
