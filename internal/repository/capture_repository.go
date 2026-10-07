@@ -58,6 +58,27 @@ type execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
+// GetCaptureModeTx returns the capture mode of the resident's existing
+// captures, or nil if they have none yet. Call it after
+// ResidentRepository.LockResidentTx so concurrent captures for the same
+// resident are serialised.
+func (r *CaptureRepository) GetCaptureModeTx(tx *sql.Tx, residentPseudonymID string) (*string, error) {
+	var mode string
+	err := tx.QueryRow(`
+		SELECT capture_mode FROM captures
+		WHERE resident_pseudonym_id = ?
+		LIMIT 1
+	`, residentPseudonymID).Scan(&mode)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &mode, nil
+}
+
 // insert builds the capture row entirely from known values (no RETURNING --
 // MySQL doesn't support it), so the returned struct is assembled directly
 // from what we just inserted rather than read back from the DB.
