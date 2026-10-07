@@ -92,6 +92,8 @@ CREATE TABLE IF NOT EXISTS captures (
         'LEFT_SLAP', 'RIGHT_SLAP'
     )),
     hand VARCHAR(5) CHECK (hand IN ('LEFT', 'RIGHT')),
+    capture_mode VARCHAR(20) NOT NULL CHECK (capture_mode IN ('SEQUENTIAL', 'SLAP')),
+    nfiq2_score FLOAT,
     nfiq2_score FLOAT,
     blur_score FLOAT,
     brightness_score FLOAT,
