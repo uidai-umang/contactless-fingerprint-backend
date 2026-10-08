@@ -68,8 +68,7 @@ CREATE TABLE IF NOT EXISTS residents (
     resident_ref_id VARCHAR(64) NOT NULL UNIQUE,
     dob DATE NOT NULL,
     age_group VARCHAR(20) CHECK (age_group IN ('5-17', '18-40', '41-60', '60+')),
-    gender VARCHAR(10) CHECK (gender IN ('MALE', 'FEMALE', 'OTHER')),
-    skin_tone VARCHAR(50)
+    gender VARCHAR(10) CHECK (gender IN ('MALE', 'FEMALE', 'OTHER'))
 ) ENGINE=InnoDB;
 
 -- Resident consent -- no session concept, tied to resident + operator directly
