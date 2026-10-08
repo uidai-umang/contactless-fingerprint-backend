@@ -95,6 +95,19 @@ func (h *AuthHandler) Refresh(ctx *gin.Context) {
 		return
 	}
 
+	exists, err := h.operatorRepo.ExistsByID(rt.OperatorID)
+	if err != nil {
+		log.Printf("Refresh operator check error: %v", err)
+		respondError(ctx, http.StatusInternalServerError, "An unexpected error occurred")
+		return
+	}
+	if !exists {
+		// Operator no longer exists (e.g. test-data reset) -- the token is dead.
+		_ = h.refreshTokenRepo.Revoke(rt.TokenID)
+		respondError(ctx, http.StatusUnauthorized, "Invalid or expired refresh token")
+		return
+	}
+
 	if err := h.refreshTokenRepo.Revoke(rt.TokenID); err != nil {
 		log.Printf("Revoke old refresh token error: %v", err)
 		respondError(ctx, http.StatusInternalServerError, "An unexpected error occurred")
