@@ -7,4 +7,5 @@ TRUNCATE TABLE devices;
 TRUNCATE TABLE camera_specs;
 TRUNCATE TABLE residents;
 TRUNCATE TABLE operators;
+TRUNCATE TABLE refresh_tokens;
 SET FOREIGN_KEY_CHECKS = 1;

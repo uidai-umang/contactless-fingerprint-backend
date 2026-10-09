@@ -60,15 +60,15 @@ CREATE TABLE IF NOT EXISTS devices (
     ram_total_mb INT
 ) ENGINE=InnoDB;
 
--- Stores resident pseudonym records -- no PII stored
+-- Stores resident pseudonym records. resident_ref_id is the Operator Mitra
+-- reference id; dob is stored for the record but never read back by the app --
+-- age_group is derived from it once at enrollment.
 CREATE TABLE IF NOT EXISTS residents (
     resident_pseudonym_id CHAR(36) PRIMARY KEY,
-    aadhaar_hash VARCHAR(64) UNIQUE NOT NULL,
+    resident_ref_id VARCHAR(64) NOT NULL UNIQUE,
+    dob DATE NOT NULL,
     age_group VARCHAR(20) CHECK (age_group IN ('5-17', '18-40', '41-60', '60+')),
-    gender VARCHAR(10) CHECK (gender IN ('MALE', 'FEMALE', 'OTHER')),
-    skin_tone VARCHAR(50),
-    capture_mode VARCHAR(20) CHECK (capture_mode IN ('SEQUENTIAL', 'SLAP')),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    gender VARCHAR(10) CHECK (gender IN ('MALE', 'FEMALE', 'OTHER'))
 ) ENGINE=InnoDB;
 
 -- Resident consent -- no session concept, tied to resident + operator directly
@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS captures (
         'LEFT_SLAP', 'RIGHT_SLAP'
     )),
     hand VARCHAR(5) CHECK (hand IN ('LEFT', 'RIGHT')),
+    capture_mode VARCHAR(20) NOT NULL CHECK (capture_mode IN ('SEQUENTIAL', 'SLAP')),
     nfiq2_score FLOAT,
     blur_score FLOAT,
     brightness_score FLOAT,

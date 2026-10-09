@@ -67,3 +67,13 @@ func (r *OperatorRepository) FindOrCreateByRefID(operatorRefId string) (*model.O
 
 	return op, nil
 }
+
+// ExistsByID reports whether an operator row with this id exists.
+func (r *OperatorRepository) ExistsByID(operatorID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM operators WHERE operator_id = ?)`,
+		operatorID,
+	).Scan(&exists)
+	return exists, err
+}

@@ -57,16 +57,19 @@ func (s *CaptureService) Upload(req model.CaptureRequest, encryptedImageBytes []
 	}
 	defer tx.Rollback()
 
-	// Row-lock the resident so two racing captures can't both set capture_mode
-	existingMode, err := s.residentRepo.LockCaptureModeTx(tx, req.ResidentPseudonymID)
+	// Row-lock the resident so two racing captures can't both pass the
+	// capture-mode check before either has inserted.
+	if err := s.residentRepo.LockResidentTx(tx, req.ResidentPseudonymID); err != nil {
+		return nil, err
+	}
+
+	// A resident's mode is the mode of their existing captures. No captures
+	// yet means this capture sets it.
+	existingMode, err := s.captureRepo.GetCaptureModeTx(tx, req.ResidentPseudonymID)
 	if err != nil {
 		return nil, err
 	}
-	if existingMode == nil {
-		if err := s.residentRepo.SetCaptureModeTx(tx, req.ResidentPseudonymID, incomingMode); err != nil {
-			return nil, err
-		}
-	} else if *existingMode != incomingMode {
+	if existingMode != nil && *existingMode != incomingMode {
 		return nil, repository.ErrCaptureModeMismatch
 	}
 

@@ -2,8 +2,10 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 
 	"contactless-fingerprint-backend/internal/model"
@@ -18,108 +20,96 @@ func NewResidentRepository(db *sql.DB) *ResidentRepository {
 	return &ResidentRepository{db: db}
 }
 
-func (r *ResidentRepository) FindOrCreateByAadhaarHash(req model.ResidentLookupRequest) (*model.Resident, error) {
-	resident := &model.Resident{}
-	var captureMode sql.NullString
+// FindByRefID looks a resident up by the Mitra resident ref id.
+// dob is deliberately not selected -- it is stored but never read back.
+func (r *ResidentRepository) FindByRefID(refID string) (*model.Resident, error) {
+	resident := &model.Resident{ResidentRefID: refID}
 
-	// Try to find existing residnet by aadhaar_hash
-	query := `
-	SELECT resident_pseudonym_id, aadhaar_hash, age_group, gender, skin_tone, capture_mode, created_at
-	FROM residents
-	WHERE aadhaar_hash = ?
-	`
-	err := r.db.QueryRow(query, req.AadhaarHash).Scan(
+	err := r.db.QueryRow(`
+		SELECT resident_pseudonym_id, COALESCE(age_group, ''), COALESCE(gender, '')
+		FROM residents
+		WHERE resident_ref_id = ?
+	`, refID).Scan(
 		&resident.ResidentPseudonymID,
-		&resident.AadhaarHash,
 		&resident.AgeGroup,
 		&resident.Gender,
-		&resident.SkinTone,
-		&captureMode,
-		&resident.CreatedAt,
 	)
-
-	if err == sql.ErrNoRows {
-		// If no existing resident found, create a new one. ID and timestamp
-		// are generated here in Go -- MySQL has no RETURNING clause, so we
-		// can't read a DB-generated ID back the way Postgres let us.
-		resident.ResidentPseudonymID = uuid.New().String()
-		resident.CreatedAt = time.Now().UTC()
-
-		insertQuery := `
-		INSERT INTO residents (resident_pseudonym_id, aadhaar_hash, age_group, gender, skin_tone, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-		`
-		_, err = r.db.Exec(insertQuery,
-			resident.ResidentPseudonymID,
-			req.AadhaarHash,
-			req.AgeGroup,
-			req.Gender,
-			req.SkinTone,
-			resident.CreatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		resident.AadhaarHash = req.AadhaarHash
-		resident.AgeGroup = req.AgeGroup
-		resident.Gender = req.Gender
-		resident.SkinTone = req.SkinTone
-		resident.CaptureMode = ""
-		return resident, nil
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	resident.CaptureMode = captureMode.String
-	return resident, nil
-}
-
-// LockCaptureModeTx fetches the resident's capture_mode with a row lock, for
-// use inside a transaction that will also decide/set it. The lock is what
-// prevents two near-simultaneous first-captures (e.g. the first two images
-// of a slap batch upload landing together) from both reading capture_mode
-// as unset and racing to set it. Returns (nil, nil) if unset, or
-// ErrNotFound if the resident doesn't exist.
-func (r *ResidentRepository) LockCaptureModeTx(tx *sql.Tx, residentPseudonymID string) (*string, error) {
-	var captureMode sql.NullString
-
-	err := tx.QueryRow(`
-		SELECT capture_mode FROM residents
-		WHERE resident_pseudonym_id = ?
-		FOR UPDATE
-	`, residentPseudonymID).Scan(&captureMode)
-
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	if !captureMode.Valid {
-		return nil, nil
-	}
-	return &captureMode.String, nil
+	return resident, nil
 }
 
-// SetCaptureModeTx sets the resident's capture_mode. Only ever called once
-// per resident, immediately after LockCaptureModeTx returns nil (unset),
-// within the same transaction/lock.
-func (r *ResidentRepository) SetCaptureModeTx(tx *sql.Tx, residentID, mode string) error {
-	_, err := tx.Exec(`
-		UPDATE residents SET capture_mode = ?
+// FindOrCreateByRefID returns the existing resident for refID, or creates one.
+// First write wins: if the resident already exists, the incoming dob / gender /
+// ageGroup are ignored and the stored values are returned.
+func (r *ResidentRepository) FindOrCreateByRefID(refID string, dob time.Time, gender, ageGroup string) (*model.Resident, error) {
+	existing, err := r.FindByRefID(refID)
+	if err == nil {
+		return existing, nil
+	}
+	if !errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
+
+	// ID is generated here in Go -- MySQL has no RETURNING clause.
+	resident := &model.Resident{
+		ResidentPseudonymID: uuid.New().String(),
+		ResidentRefID:       refID,
+		AgeGroup:            ageGroup,
+		Gender:              gender,
+	}
+
+	_, err = r.db.Exec(`
+		INSERT INTO residents (resident_pseudonym_id, resident_ref_id, dob, gender, age_group)
+		VALUES (?, ?, ?, ?, ?)
+	`,
+		resident.ResidentPseudonymID,
+		refID,
+		dob.Format("2006-01-02"),
+		gender,
+		ageGroup,
+	)
+	if err != nil {
+		var mysqlErr *mysql.MySQLError
+		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+			// Another request inserted the same ref id between our SELECT and
+			// INSERT -- return that row instead of failing.
+			return r.FindByRefID(refID)
+		}
+		return nil, err
+	}
+
+	return resident, nil
+}
+
+// LockResidentTx takes a row lock on the resident for the rest of the
+// transaction. This is what serialises two near-simultaneous captures for the
+// same resident (e.g. the images of a slap batch), so both can't pass the
+// capture-mode check before either has inserted. Returns ErrNotFound if the
+// resident doesn't exist.
+func (r *ResidentRepository) LockResidentTx(tx *sql.Tx, residentPseudonymID string) error {
+	var id string
+	err := tx.QueryRow(`
+		SELECT resident_pseudonym_id FROM residents
 		WHERE resident_pseudonym_id = ?
-	`, mode, residentID)
+		FOR UPDATE
+	`, residentPseudonymID).Scan(&id)
+
+	if err == sql.ErrNoRows {
+		return ErrNotFound
+	}
 	return err
 }
 
-// DeleteByAadhaarHash wipes all data for a resident — used in dev/test only
-func (r *ResidentRepository) DeleteByAadhaarHash(aadhaarHash string) error {
+// DeleteByRefID wipes a resident -- used in dev/test only
+func (r *ResidentRepository) DeleteByRefID(refID string) error {
 	_, err := r.db.Exec(
-		`DELETE FROM residents WHERE aadhaar_hash = ?`,
-		aadhaarHash,
+		`DELETE FROM residents WHERE resident_ref_id = ?`,
+		refID,
 	)
 	return err
 }
