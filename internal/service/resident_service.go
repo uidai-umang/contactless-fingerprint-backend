@@ -1,6 +1,8 @@
 package service
 
 import (
+	"time"
+
 	"contactless-fingerprint-backend/internal/model"
 	"contactless-fingerprint-backend/internal/repository"
 )
@@ -17,11 +19,11 @@ func NewResidentService(residentRepo *repository.ResidentRepository, captureRepo
 	}
 }
 
-// LookupOrCreate finds or creates a resident by aadhaar_hash,
-// then fetches their capture progress and returns a summary
-// including which fingers are done and whether the session is complete.
-func (s *ResidentService) FindOrCreateResident(req model.ResidentLookupRequest) (*model.ResidentLookupResponse, error) {
-	resident, err := s.residentRepo.FindOrCreateByAadhaarHash(req)
+// FindOrCreateResident finds or creates a resident by Mitra ref id, then
+// fetches their capture progress and returns a summary including which
+// fingers are done and whether the resident is complete.
+func (s *ResidentService) FindOrCreateResident(refID string, dob time.Time, gender, ageGroup string) (*model.ResidentLookupResponse, error) {
+	resident, err := s.residentRepo.FindOrCreateByRefID(refID, dob, gender, ageGroup)
 	if err != nil {
 		return nil, err
 	}
@@ -46,18 +48,26 @@ func (s *ResidentService) FindOrCreateResident(req model.ResidentLookupRequest) 
 		}
 	}
 
-	// Required count depends on which mode this resident is locked into.
-	// Unset (no captures yet) defaults to the SEQUENTIAL count — harmless,
-	// since len(capturedFingers) is 0 either way at that point.
+	// A resident's capture mode is whatever mode their captures were made in.
+	// Empty when there are no captures yet.
+	captureMode := ""
+	if len(captures) > 0 {
+		captureMode = captures[0].CaptureMode
+	}
+
+	// Required count depends on the resident's capture mode. Unset defaults to
+	// the SEQUENTIAL count -- harmless, since len(capturedFingers) is 0 then.
 	requiredCount := 10
-	if resident.CaptureMode == model.CaptureModeSlap {
+	if captureMode == model.CaptureModeSlap {
 		requiredCount = 4
 	}
 	isComplete := len(capturedFingers) >= requiredCount
 
 	return &model.ResidentLookupResponse{
 		ResidentPseudonymID: resident.ResidentPseudonymID,
-		CaptureMode:         resident.CaptureMode,
+		Gender:              resident.Gender,
+		AgeGroup:            resident.AgeGroup,
+		CaptureMode:         captureMode,
 		CapturedFingers:     capturedFingers,
 		PendingUploads:      pendingUploads,
 		TotalCaptured:       len(capturedFingers),
@@ -65,7 +75,7 @@ func (s *ResidentService) FindOrCreateResident(req model.ResidentLookupRequest) 
 	}, nil
 }
 
-// Reset wipes all resident data for testing purposes — dev only
-func (s *ResidentService) Reset(aadhaarHash string) error {
-	return s.residentRepo.DeleteByAadhaarHash(aadhaarHash)
+// Reset wipes a resident for testing purposes -- dev only
+func (s *ResidentService) Reset(refID string) error {
+	return s.residentRepo.DeleteByRefID(refID)
 }

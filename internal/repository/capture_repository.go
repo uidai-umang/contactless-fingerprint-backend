@@ -58,6 +58,27 @@ type execer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
+// GetCaptureModeTx returns the capture mode of the resident's existing
+// captures, or nil if they have none yet. Call it after
+// ResidentRepository.LockResidentTx so concurrent captures for the same
+// resident are serialised.
+func (r *CaptureRepository) GetCaptureModeTx(tx *sql.Tx, residentPseudonymID string) (*string, error) {
+	var mode string
+	err := tx.QueryRow(`
+		SELECT capture_mode FROM captures
+		WHERE resident_pseudonym_id = ?
+		LIMIT 1
+	`, residentPseudonymID).Scan(&mode)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &mode, nil
+}
+
 // insert builds the capture row entirely from known values (no RETURNING --
 // MySQL doesn't support it), so the returned struct is assembled directly
 // from what we just inserted rather than read back from the DB.
@@ -68,6 +89,7 @@ func (r *CaptureRepository) insert(q execer, req model.CaptureRequest, cephKey s
 		OperatorID:          req.OperatorID,
 		FingerType:          req.FingerType,
 		Hand:                req.Hand,
+		CaptureMode:         req.CaptureMode,
 		Nfiq2Score:          req.Nfiq2Score,
 		BlurScore:           req.BlurScore,
 		BrightnessScore:     req.BrightnessScore,
@@ -86,13 +108,13 @@ func (r *CaptureRepository) insert(q execer, req model.CaptureRequest, cephKey s
 	query := `
 		INSERT INTO captures (
 			capture_id, resident_pseudonym_id, operator_id,
-			finger_type, hand, nfiq2_score, blur_score,
+			finger_type, hand, capture_mode, nfiq2_score, blur_score,
 			brightness_score, glare_score, attempt_count,
 			degraded_flag, ceph_object_key, image_checksum,
 			camera_model, camera_resolution, device_model,
 			upload_status, created_at
 		) VALUES (
-			?, ?, ?, ?, ?, ?, ?, ?, ?,
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 			?, ?, ?, ?, ?, ?, ?, ?, ?
 		)
 	`
@@ -103,6 +125,7 @@ func (r *CaptureRepository) insert(q execer, req model.CaptureRequest, cephKey s
 		capture.OperatorID,
 		capture.FingerType,
 		capture.Hand,
+		capture.CaptureMode,
 		capture.Nfiq2Score,
 		capture.BlurScore,
 		capture.BrightnessScore,
@@ -135,7 +158,7 @@ func (r *CaptureRepository) insert(q execer, req model.CaptureRequest, cephKey s
 func (r *CaptureRepository) GetByResidentID(residentID string) ([]model.Capture, error) {
 	rows, err := r.db.Query(`
 		SELECT capture_id, resident_pseudonym_id,
-		       operator_id, finger_type, hand, nfiq2_score,
+		       operator_id, finger_type, hand, capture_mode, nfiq2_score,
 		       blur_score, brightness_score, glare_score,
 		       attempt_count, degraded_flag, upload_status, created_at
 		FROM captures
@@ -156,6 +179,7 @@ func (r *CaptureRepository) GetByResidentID(residentID string) ([]model.Capture,
 			&c.OperatorID,
 			&c.FingerType,
 			&c.Hand,
+			&c.CaptureMode,
 			&c.Nfiq2Score,
 			&c.BlurScore,
 			&c.BrightnessScore,

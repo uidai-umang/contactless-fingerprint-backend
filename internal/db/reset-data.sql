@@ -1,0 +1,11 @@
+SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE captures;
+TRUNCATE TABLE consents;
+TRUNCATE TABLE quota_overrides;
+TRUNCATE TABLE audit_logs;
+TRUNCATE TABLE devices;
+TRUNCATE TABLE camera_specs;
+TRUNCATE TABLE residents;
+TRUNCATE TABLE operators;
+TRUNCATE TABLE refresh_tokens;
+SET FOREIGN_KEY_CHECKS = 1;

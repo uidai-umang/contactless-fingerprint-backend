@@ -4,22 +4,18 @@ import "time"
 
 // Operator represents a data collection operator
 type Operator struct {
-	OperatorID  string     `json:"operator_id"`
-	FaceAuthRef string     `json:"face_auth_ref"`
-	Status      string     `json:"status"`
-	CreatedAt   time.Time  `json:"created_at"`
-	LastLoginAt *time.Time `json:"last_login_at"`
+	OperatorID    string    `json:"operator_id"`
+	OperatorRefID string    `json:"operator_ref_id"`
+	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // Resident — no PII stored
 type Resident struct {
-	ResidentPseudonymID string    `json:"resident_pseudonym_id"`
-	AadhaarHash         string    `json:"-"`
-	AgeGroup            string    `json:"age_group"`
-	Gender              string    `json:"gender"`
-	SkinTone            string    `json:"skin_tone"`
-	CaptureMode         string    `json:"capture_mode"` // "" until first capture sets it
-	CreatedAt           time.Time `json:"created_at"`
+	ResidentPseudonymID string `json:"resident_pseudonym_id"`
+	ResidentRefID       string `json:"-"`
+	AgeGroup            string `json:"age_group"`
+	Gender              string `json:"gender"`
 }
 
 // Client declares capture_mode per request; can't be inferred from finger_type
@@ -46,6 +42,7 @@ type Capture struct {
 	OperatorID          string     `json:"operator_id"`
 	FingerType          string     `json:"finger_type"`
 	Hand                string     `json:"hand"`
+	CaptureMode         string     `json:"capture_mode"`
 	Nfiq2Score          float64    `json:"nfiq2_score"`
 	BlurScore           float64    `json:"blur_score"`
 	BrightnessScore     float64    `json:"brightness_score"`
@@ -77,14 +74,15 @@ type AuditLog struct {
 // ── Request / Response structs ──────────────────────────────────
 
 type ResidentLookupRequest struct {
-	AadhaarHash string `json:"aadhaar_hash" binding:"required"`
-	AgeGroup    string `json:"age_group"`
-	Gender      string `json:"gender"`
-	SkinTone    string `json:"skin_tone"`
+	ResidentRefID string `json:"resident_ref_id" binding:"required"`
+	DateOfBirth   string `json:"date_of_birth" binding:"required"`
+	Gender        string `json:"gender" binding:"required"`
 }
 
 type ResidentLookupResponse struct {
 	ResidentPseudonymID string   `json:"resident_pseudonym_id"`
+	Gender              string   `json:"gender"`
+	AgeGroup            string   `json:"age_group"`
 	CaptureMode         string   `json:"capture_mode"`
 	CapturedFingers     []string `json:"captured_fingers"`
 	PendingUploads      []string `json:"pending_uploads"`
@@ -126,7 +124,45 @@ type CaptureResponse struct {
 	IsComplete    bool   `json:"is_complete"`
 }
 
-// DevResetRequest wipes all data for a resident — dev/test only
+// DevResetRequest wipes a resident -- dev/test only
 type DevResetRequest struct {
-	AadhaarHash string `json:"aadhaar_hash" binding:"required"`
+	ResidentRefID string `json:"resident_ref_id" binding:"required"`
+}
+
+type OperatorLookupRequest struct {
+	OperatorRefID string `json:"operator_ref_id" binding:"required"`
+}
+
+type OperatorLookupResponse struct {
+	OperatorID    string `json:"operator_id"`
+	OperatorRefID string `json:"operator_ref_id"`
+	Status        string `json:"status"`
+}
+
+type RefreshToken struct {
+	TokenID    string     `json:"-"`
+	OperatorID string     `json:"-"`
+	TokenHash  string     `json:"-"`
+	ExpiresAt  time.Time  `json:"-"`
+	RevokedAt  *time.Time `json:"-"`
+	CreatedAt  time.Time  `json:"-"`
+}
+
+type AuthTokenRequest struct {
+	OperatorRefID string `json:"operator_ref_id" binding:"required"`
+}
+
+type AuthTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int    `json:"expires_in"` // seconds until access_token expires
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
 }

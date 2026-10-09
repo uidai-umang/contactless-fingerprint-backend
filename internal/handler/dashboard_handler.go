@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"contactless-fingerprint-backend/internal/middleware"
 	"contactless-fingerprint-backend/internal/service"
 )
 
@@ -23,11 +24,7 @@ func NewDashboardHandler(dashboardService *service.DashboardService, quotaServic
 //	400 — operator_id missing
 //	500 — unexpected DB error
 func (h *DashboardHandler) Overview(ctx *gin.Context) {
-	operatorID := ctx.Query("operator_id")
-	if operatorID == "" {
-		respondError(ctx, http.StatusBadRequest, "operator_id is required")
-		return
-	}
+	operatorID := middleware.OperatorID(ctx)
 
 	overview, err := h.dashboardService.GetOverview(operatorID)
 	if err != nil {
@@ -44,11 +41,7 @@ func (h *DashboardHandler) Overview(ctx *gin.Context) {
 //	400 — operator_id missing
 //	500 — unexpected DB error
 func (h *DashboardHandler) Diversity(ctx *gin.Context) {
-	operatorID := ctx.Query("operator_id")
-	if operatorID == "" {
-		respondError(ctx, http.StatusBadRequest, "operator_id is required")
-		return
-	}
+	operatorID := middleware.OperatorID(ctx)
 
 	diversity, err := h.quotaService.BuildDiversityLines(operatorID)
 	if err != nil {
@@ -65,11 +58,7 @@ func (h *DashboardHandler) Diversity(ctx *gin.Context) {
 //	400 — operator_id missing
 //	500 — unexpected DB error
 func (h *DashboardHandler) Fingers(ctx *gin.Context) {
-	operatorID := ctx.Query("operator_id")
-	if operatorID == "" {
-		respondError(ctx, http.StatusBadRequest, "operator_id is required")
-		return
-	}
+	operatorID := middleware.OperatorID(ctx)
 
 	fingers, err := h.dashboardService.GetFingerStats(operatorID)
 	if err != nil {

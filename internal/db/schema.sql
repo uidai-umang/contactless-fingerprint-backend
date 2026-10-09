@@ -5,12 +5,9 @@
 -- Stores operator accounts
 CREATE TABLE IF NOT EXISTS operators (
     operator_id CHAR(36) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    phone_number VARCHAR(15) UNIQUE NOT NULL,
+    operator_ref_id VARCHAR(255) UNIQUE,
     status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'SUSPENDED')),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_login_at TIMESTAMP NULL
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 -- Stores camera hardware specifications, deduped by fingerprint hash.
@@ -63,15 +60,15 @@ CREATE TABLE IF NOT EXISTS devices (
     ram_total_mb INT
 ) ENGINE=InnoDB;
 
--- Stores resident pseudonym records -- no PII stored
+-- Stores resident pseudonym records. resident_ref_id is the Operator Mitra
+-- reference id; dob is stored for the record but never read back by the app --
+-- age_group is derived from it once at enrollment.
 CREATE TABLE IF NOT EXISTS residents (
     resident_pseudonym_id CHAR(36) PRIMARY KEY,
-    aadhaar_hash VARCHAR(64) UNIQUE NOT NULL,
+    resident_ref_id VARCHAR(64) NOT NULL UNIQUE,
+    dob DATE NOT NULL,
     age_group VARCHAR(20) CHECK (age_group IN ('5-17', '18-40', '41-60', '60+')),
-    gender VARCHAR(10) CHECK (gender IN ('MALE', 'FEMALE', 'OTHER')),
-    skin_tone VARCHAR(50),
-    capture_mode VARCHAR(20) CHECK (capture_mode IN ('SEQUENTIAL', 'SLAP')),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    gender VARCHAR(10) CHECK (gender IN ('MALE', 'FEMALE', 'OTHER'))
 ) ENGINE=InnoDB;
 
 -- Resident consent -- no session concept, tied to resident + operator directly
@@ -95,6 +92,7 @@ CREATE TABLE IF NOT EXISTS captures (
         'LEFT_SLAP', 'RIGHT_SLAP'
     )),
     hand VARCHAR(5) CHECK (hand IN ('LEFT', 'RIGHT')),
+    capture_mode VARCHAR(20) NOT NULL CHECK (capture_mode IN ('SEQUENTIAL', 'SLAP')),
     nfiq2_score FLOAT,
     blur_score FLOAT,
     brightness_score FLOAT,
@@ -176,3 +174,14 @@ CREATE TABLE IF NOT EXISTS quota_overrides (
 
 CREATE INDEX idx_quota_overrides_dimension_key ON quota_overrides(dimension, `key`);
 CREATE INDEX idx_quota_overrides_operator ON quota_overrides(operator_id);
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    token_id    CHAR(36) PRIMARY KEY,
+    operator_id CHAR(36) NOT NULL REFERENCES operators(operator_id),
+    token_hash  CHAR(64) NOT NULL UNIQUE,
+    expires_at  TIMESTAMP NOT NULL,
+    revoked_at  TIMESTAMP NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_refresh_tokens_operator ON refresh_tokens(operator_id);
