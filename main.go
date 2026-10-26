@@ -78,6 +78,7 @@ func main() {
 	// ── Dependency injection ──────────────────────────────────────────────
 	// Repositories — talk to DB
 	residentRepo := repository.NewResidentRepository(db.DB)
+	consentRepo := repository.NewConsentRepository(db.DB)
 	captureRepo := repository.NewCaptureRepository(db.DB)
 	cameraSpecRepo := repository.NewCameraSpecRepository(db.DB)
 	deviceRepo := repository.NewDeviceRepository(db.DB)
@@ -87,7 +88,8 @@ func main() {
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db.DB)
 
 	// Services — business logic
-	residentService := service.NewResidentService(residentRepo, captureRepo)
+	residentService := service.NewResidentService(residentRepo, captureRepo, consentRepo)
+	consentService := service.NewConsentService(consentRepo, residentRepo)
 	captureService := service.NewCaptureService(db.DB, captureRepo, residentRepo, imageStore, decrypter)
 	deviceService := service.NewDeviceService(deviceRepo, cameraSpecRepo)
 	dashboardService := service.NewDashboardService(dashboardRepo)
@@ -95,6 +97,7 @@ func main() {
 
 	// Handlers — HTTP layer
 	residentHandler := handler.NewResidentHandler(residentService)
+	consentHandler := handler.NewConsentHandler(consentService)
 	captureHandler := handler.NewCaptureHandler(captureService)
 	deviceHandler := handler.NewDeviceHandler(deviceService)
 	dashboardHandler := handler.NewDashboardHandler(dashboardService, quotaService)
@@ -123,6 +126,7 @@ func main() {
 		protected.Use(middleware.RequireAuth())
 		{
 			protected.POST("/residents/lookup", residentHandler.LookupOrCreate)
+			protected.POST("/residents/consent", consentHandler.Record)
 			protected.POST("/operators/lookup", operatorHandler.LookupOrCreate)
 			protected.POST("/captures", captureHandler.Upload)
 			protected.POST("/captures/batch", captureHandler.BatchUpload)
