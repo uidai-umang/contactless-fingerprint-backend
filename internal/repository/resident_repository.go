@@ -113,3 +113,12 @@ func (r *ResidentRepository) DeleteByRefID(refID string) error {
 	)
 	return err
 }
+
+// ExistsByID reports whether a resident with this pseudonym id exists.
+func (r *ResidentRepository) ExistsByID(residentPseudonymID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(`
+		SELECT EXISTS(SELECT 1 FROM residents WHERE resident_pseudonym_id = ?)
+	`, residentPseudonymID).Scan(&exists)
+	return exists, err
+}

@@ -88,6 +88,20 @@ type ResidentLookupResponse struct {
 	PendingUploads      []string `json:"pending_uploads"`
 	TotalCaptured       int      `json:"total_captured"`
 	IsComplete          bool     `json:"is_complete"`
+	IsConsented         bool     `json:"is_consented"`
+}
+
+// ConsentRequest is what the app sends after the resident answers the consent screen.
+// Consented is a pointer so that an explicit false is accepted but a missing field is rejected.
+type ConsentRequest struct {
+	ResidentPseudonymID string `json:"resident_pseudonym_id" binding:"required"`
+	Consented           *bool  `json:"consented" binding:"required"`
+	LanguageShown       string `json:"language_shown"`
+}
+
+type ConsentResponse struct {
+	ResidentPseudonymID string `json:"resident_pseudonym_id"`
+	IsConsented         bool   `json:"is_consented"`
 }
 
 type CaptureRequest struct {

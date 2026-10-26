@@ -10,12 +10,14 @@ import (
 type ResidentService struct {
 	residentRepo *repository.ResidentRepository
 	captureRepo  *repository.CaptureRepository
+	consentRepo  *repository.ConsentRepository
 }
 
-func NewResidentService(residentRepo *repository.ResidentRepository, captureRepo *repository.CaptureRepository) *ResidentService {
+func NewResidentService(residentRepo *repository.ResidentRepository, captureRepo *repository.CaptureRepository, consentRepo *repository.ConsentRepository) *ResidentService {
 	return &ResidentService{
 		residentRepo: residentRepo,
 		captureRepo:  captureRepo,
+		consentRepo:  consentRepo,
 	}
 }
 
@@ -63,6 +65,12 @@ func (s *ResidentService) FindOrCreateResident(refID string, dob time.Time, gend
 	}
 	isComplete := len(capturedFingers) >= requiredCount
 
+	isConsented, err := s.consentRepo.IsConsented(resident.ResidentPseudonymID)
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &model.ResidentLookupResponse{
 		ResidentPseudonymID: resident.ResidentPseudonymID,
 		Gender:              resident.Gender,
@@ -72,6 +80,7 @@ func (s *ResidentService) FindOrCreateResident(refID string, dob time.Time, gend
 		PendingUploads:      pendingUploads,
 		TotalCaptured:       len(capturedFingers),
 		IsComplete:          isComplete,
+		IsConsented:         isConsented,
 	}, nil
 }
 
