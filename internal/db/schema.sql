@@ -7,7 +7,16 @@ CREATE TABLE IF NOT EXISTS operators (
     operator_id CHAR(36) PRIMARY KEY,
     operator_ref_id VARCHAR(255) UNIQUE,
     status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'SUSPENDED')),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    is_fraud BOOLEAN NOT NULL DEFAULT FALSE,
+    date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    date_modified TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Operators allowed to enroll. An operator_ref_id not in operators must be
+-- listed here before /auth/token or /operators/lookup will create it.
+CREATE TABLE IF NOT EXISTS allowed_operators (
+    operator_ref_id VARCHAR(255) PRIMARY KEY,
+    date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 -- Stores camera hardware specifications, deduped by fingerprint hash.

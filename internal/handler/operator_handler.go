@@ -1,26 +1,34 @@
 package handler
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 
 	"contactless-fingerprint-backend/internal/model"
-	"contactless-fingerprint-backend/internal/repository"
+	"contactless-fingerprint-backend/internal/service"
 )
 
+const operatorNotAllowedMessage = "You are not allowed to proceed for data collection"
+
 type OperatorHandler struct {
-	operatorRepo *repository.OperatorRepository
+	operatorService *service.OperatorService
 }
 
-func NewOperatorHandler(operatorRepo *repository.OperatorRepository) *OperatorHandler {
-	return &OperatorHandler{operatorRepo: operatorRepo}
+func NewOperatorHandler(operatorService *service.OperatorService) *OperatorHandler {
+	return &OperatorHandler{operatorService: operatorService}
 }
 
 // LookupOrCreate handles operator lookup by operator_ref_id (supplied by
-// Operator Mitra). Creates a new operator record the first time a given
-// ref_id is seen.
+// Operator Mitra). An operator already in operators is returned as is; a new
+// one is created only if it is in the allowed list.
+//
+//	200 -- operator found / created
+//	400 -- malformed body
+//	403 -- not on the allowed list, or marked fraud
+//	500 -- unexpected error
 func (h *OperatorHandler) LookupOrCreate(ctx *gin.Context) {
 	var req model.OperatorLookupRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -28,8 +36,12 @@ func (h *OperatorHandler) LookupOrCreate(ctx *gin.Context) {
 		return
 	}
 
-	op, err := h.operatorRepo.FindOrCreateByRefID(req.OperatorRefID)
+	op, err := h.operatorService.Authorize(req.OperatorRefID)
 	if err != nil {
+		if errors.Is(err, service.ErrOperatorNotAllowed) {
+			respondError(ctx, http.StatusForbidden, operatorNotAllowedMessage)
+			return
+		}
 		log.Printf("LookupOrCreate service error: %v", err)
 		respondError(ctx, http.StatusInternalServerError, "An unexpected error occurred")
 		return
