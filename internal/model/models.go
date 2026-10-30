@@ -7,7 +7,9 @@ type Operator struct {
 	OperatorID    string    `json:"operator_id"`
 	OperatorRefID string    `json:"operator_ref_id"`
 	Status        string    `json:"status"`
-	CreatedAt     time.Time `json:"created_at"`
+	IsFraud       bool      `json:"is_fraud"`
+	DateCreated   time.Time `json:"date_created"`
+	DateModified  time.Time `json:"date_modified"`
 }
 
 // Resident — no PII stored
@@ -179,4 +181,16 @@ type RefreshRequest struct {
 
 type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+// AllowedOperatorRequest adds an operator_ref_id to the allowed list.
+type AllowedOperatorRequest struct {
+	OperatorRefID string `json:"operator_ref_id" binding:"required"`
+}
+
+// OperatorFraudRequest marks (true) or clears (false) the fraud flag.
+// IsFraud is a pointer so an explicit false is accepted.
+type OperatorFraudRequest struct {
+	OperatorRefID string `json:"operator_ref_id" binding:"required"`
+	IsFraud       *bool  `json:"is_fraud" binding:"required"`
 }

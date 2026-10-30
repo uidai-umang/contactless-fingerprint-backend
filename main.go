@@ -94,6 +94,7 @@ func main() {
 	deviceService := service.NewDeviceService(deviceRepo, cameraSpecRepo)
 	dashboardService := service.NewDashboardService(dashboardRepo)
 	quotaService := service.NewQuotaService(quotaRepo)
+	operatorService := service.NewOperatorService(operatorRepo)
 
 	// Handlers — HTTP layer
 	residentHandler := handler.NewResidentHandler(residentService)
@@ -103,8 +104,9 @@ func main() {
 	dashboardHandler := handler.NewDashboardHandler(dashboardService, quotaService)
 	quotaHandler := handler.NewQuotaHandler(quotaService)
 	devHandler := handler.NewDevHandler(operatorRepo)
-	operatorHandler := handler.NewOperatorHandler(operatorRepo)
-	authHandler := handler.NewAuthHandler(operatorRepo, refreshTokenRepo)
+	operatorHandler := handler.NewOperatorHandler(operatorService)
+	authHandler := handler.NewAuthHandler(operatorService, operatorRepo, refreshTokenRepo)
+	adminHandler := handler.NewAdminHandler(operatorService)
 
 	// ── Routes ───────────────────────────────────────────────────────────
 	api := router.Group("/clf/v1")
@@ -121,6 +123,13 @@ func main() {
 		api.POST("/auth/logout", authHandler.Logout)
 		api.POST("/dev/operators/register", devHandler.RegisterTestOperator)
 		api.DELETE("/dev/reset", residentHandler.Reset)
+
+		admin := api.Group("/admin")
+		admin.Use(middleware.RequireAdminKey())
+		{
+			admin.POST("/allowed-operators", adminHandler.AddAllowedOperator)
+			admin.POST("/operators/fraud", adminHandler.SetOperatorFraud)
+		}
 
 		protected := api.Group("")
 		protected.Use(middleware.RequireAuth())

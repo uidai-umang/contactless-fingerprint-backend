@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -10,15 +11,17 @@ import (
 	"contactless-fingerprint-backend/internal/auth"
 	"contactless-fingerprint-backend/internal/model"
 	"contactless-fingerprint-backend/internal/repository"
+	"contactless-fingerprint-backend/internal/service"
 )
 
 type AuthHandler struct {
+	operatorService  *service.OperatorService
 	operatorRepo     *repository.OperatorRepository
 	refreshTokenRepo *repository.RefreshTokenRepository
 }
 
-func NewAuthHandler(operatorRepo *repository.OperatorRepository, refreshTokenRepo *repository.RefreshTokenRepository) *AuthHandler {
-	return &AuthHandler{operatorRepo: operatorRepo, refreshTokenRepo: refreshTokenRepo}
+func NewAuthHandler(operatorService *service.OperatorService, operatorRepo *repository.OperatorRepository, refreshTokenRepo *repository.RefreshTokenRepository) *AuthHandler {
+	return &AuthHandler{operatorService: operatorService, operatorRepo: operatorRepo, refreshTokenRepo: refreshTokenRepo}
 }
 
 // issueTokenPair is shared by IssueToken and Refresh -- both end with
@@ -62,8 +65,12 @@ func (h *AuthHandler) IssueToken(ctx *gin.Context) {
 		return
 	}
 
-	op, err := h.operatorRepo.FindOrCreateByRefID(req.OperatorRefID)
+	op, err := h.operatorService.Authorize(req.OperatorRefID)
 	if err != nil {
+		if errors.Is(err, service.ErrOperatorNotAllowed) {
+			respondError(ctx, http.StatusForbidden, operatorNotAllowedMessage)
+			return
+		}
 		log.Printf("IssueToken lookup error: %v", err)
 		respondError(ctx, http.StatusInternalServerError, "An unexpected error occurred")
 		return
@@ -95,14 +102,16 @@ func (h *AuthHandler) Refresh(ctx *gin.Context) {
 		return
 	}
 
-	exists, err := h.operatorRepo.ExistsByID(rt.OperatorID)
-	if err != nil {
+	op, err := h.operatorRepo.FindByID(rt.OperatorID)
+
+	if err != nil && !errors.Is(err, repository.ErrNotFound) {
 		log.Printf("Refresh operator check error: %v", err)
 		respondError(ctx, http.StatusInternalServerError, "An unexpected error occurred")
 		return
 	}
-	if !exists {
-		// Operator no longer exists (e.g. test-data reset) -- the token is dead.
+
+	if err != nil || op.IsFraud {
+		// Operator no longer exists (e.g. test-data reset) or is marked fraud -- the token is dead.
 		_ = h.refreshTokenRepo.Revoke(rt.TokenID)
 		respondError(ctx, http.StatusUnauthorized, "Invalid or expired refresh token")
 		return
