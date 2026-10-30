@@ -3,7 +3,6 @@ package repository
 import (
 	"contactless-fingerprint-backend/internal/model"
 	"database/sql"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -66,26 +65,17 @@ func (r *OperatorRepository) FindByID(operatorID string) (*model.Operator, error
 }
 
 // Create inserts a new ACTIVE, non-fraud operator for this operator_ref_id.
+// date_created / date_modified are filled by the DB defaults.
 func (r *OperatorRepository) Create(operatorRefID string) (*model.Operator, error) {
-	now := time.Now().UTC()
-	op := &model.Operator{
-		OperatorID:    uuid.New().String(),
-		OperatorRefID: operatorRefID,
-		Status:        "ACTIVE",
-		IsFraud:       false,
-		DateCreated:   now,
-		DateModified:  now,
-	}
-
 	_, err := r.db.Exec(`
-		INSERT INTO operators (operator_id, operator_ref_id, status, date_created, date_modified)
-		VALUES (?, ?, 'ACTIVE', ?, ?)
-	`, op.OperatorID, op.OperatorRefID, op.DateCreated, op.DateModified)
+		INSERT INTO operators (operator_id, operator_ref_id, status)
+		VALUES (?, ?, 'ACTIVE')
+	`, uuid.New().String(), operatorRefID)
 	if err != nil {
 		return nil, err
 	}
 
-	return op, nil
+	return r.FindByRefID(operatorRefID)
 }
 
 // ExistsByID reports whether an operator row with this id exists.
@@ -112,8 +102,8 @@ func (r *OperatorRepository) IsAllowed(operatorRefID string) (bool, error) {
 // false if it was already there.
 func (r *OperatorRepository) AddAllowed(operatorRefID string) (created bool, err error) {
 	res, err := r.db.Exec(
-		`INSERT IGNORE INTO allowed_operators (operator_ref_id, date_created) VALUES (?, ?)`,
-		operatorRefID, time.Now().UTC(),
+		`INSERT IGNORE INTO allowed_operators (operator_ref_id) VALUES (?)`,
+		operatorRefID,
 	)
 	if err != nil {
 		return false, err
